@@ -89,11 +89,11 @@ GitHub Actions runs both on every push (`.github/workflows/ci.yml`).
 ### Backend + database on Railway
 
 1. railway.com → **New Project** → **Deploy from GitHub repo** → pick `mytimetablepal`.
-2. Open the new service → **Settings** → **Root Directory** = `backend`. Railway then uses `railway.json` at the repo root (Railway reads it from there even with a root directory set): it collects static files at build time, runs `migrate` before each deploy, starts gunicorn, and health-checks `/api/health/`.
+2. Open the new service → **Settings** → **Root Directory** = `backend`. Railway then uses `railway.json` at the repo root (Railway reads it from there even with a root directory set): it collects static files at build time; on start it runs `migrate` and `seed_demo --if-missing`, then gunicorn, and health-checks `/api/health/`.
 3. In the project canvas: **+ Create** → **Database** → **PostgreSQL**.
 4. Service → **Variables**: add `SECRET_KEY` (new random value), `DEBUG=False`, `DATABASE_URL=${{Postgres.DATABASE_URL}}`, `CORS_ALLOWED_ORIGINS=<your Vercel URL>`.
 5. Service → **Settings** → **Networking** → **Generate Domain**.
-6. Demo data: set `SEED_DEMO=true` and the pre-deploy step runs `seed_demo --if-missing` (creates the demo school only if it does not exist yet).
+6. Demo data: set `SEED_DEMO=true` and the start command runs `seed_demo --if-missing` (creates the demo school only if it does not exist yet).
 
 ### Frontend on Vercel
 
