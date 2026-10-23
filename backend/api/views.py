@@ -1,6 +1,3 @@
-from collections import Counter
-import random
-
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -12,15 +9,17 @@ from rest_framework.views import APIView
 
 from .models import (
     School, Teacher, Classroom, Schedule, SchedulePeriod, TeacherAvailablePeriod,
-    Subject, StudentGroup, Timetable, TimetableEntry, Availability, SubjectRequirement
+    Subject, StudentGroup, Timetable, Availability, SubjectRequirement, TimetableJob,
+    DEFAULT_SOLVER_WEIGHTS,
 )
 from .serializer import (
     RegisterSerializer,
     SchoolSerializer, TeacherSerializer, AvailabilitySerializer, ClassroomSerializer,
     SchedulePeriodSerializer, ScheduleSerializer, SubjectSerializer,
     StudentGroupSerializer, TimetableSerializer, TimetableEntrySerializer,
-    SubjectRequirementSerializer,
+    SubjectRequirementSerializer, TimetableJobSerializer,
 )
+from .timetable_jobs import build_problem, expire_stale, solver_settings_for, start_job
 
 User = get_user_model()
 
@@ -230,8 +229,28 @@ class TimetableViewSet(SchoolScopedMixin, viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def generate(self, request, pk=None, school_id=None):
-        """POST /schools/{school_id}/timetables/{id}/generate/"""
-        return generate_timetable(self.get_object())
+        """POST /schools/{school_id}/timetables/{id}/generate/ -> 202 with a job to poll."""
+        return start_generation(request, self.get_object())
+
+    @action(detail=True, methods=['get'])
+    def precheck(self, request, pk=None, school_id=None):
+        """GET /schools/{school_id}/timetables/{id}/precheck/ - fast check for impossible input."""
+        from .scheduling.solver import precheck as run_precheck
+        problem, _ = build_problem(self.get_object())
+        reasons = run_precheck(problem)
+        return Response({"ok": not reasons, "reasons": reasons})
+
+    @action(detail=True, methods=['get'])
+    def jobs(self, request, pk=None, school_id=None):
+        """GET .../timetables/{id}/jobs/ - latest 10 generator runs."""
+        jobs = [expire_stale(j) for j in self.get_object().jobs.all()[:10]]
+        return Response(TimetableJobSerializer(jobs, many=True).data)
+
+    @action(detail=True, methods=['get'], url_path=r'jobs/(?P<job_id>\d+)')
+    def job_detail(self, request, pk=None, school_id=None, job_id=None):
+        """GET .../timetables/{id}/jobs/{job_id}/ - poll this for progress."""
+        job = get_object_or_404(TimetableJob, id=job_id, timetable=self.get_object())
+        return Response(TimetableJobSerializer(expire_stale(job)).data)
 
     @action(detail=True, methods=['get'])
     def json_view(self, request, pk=None, school_id=None):
@@ -369,127 +388,41 @@ class TimetableJSONView(APIView):
         return Response(build_timetable_pages(timetable, request.GET.get("type", "grade")))
 
 
-class TimetableSolver:
-    """Heuristic generator (to be replaced by the OR-Tools solver in api/scheduling)."""
-
-    def __init__(self, groups, periods, classrooms, days, requirements):
-        self.groups = groups
-        self.periods = sorted(periods, key=lambda x: x.id)
-        self.classrooms = classrooms
-        self.days = days
-        self.requirements = requirements
-        self.home_rooms = {g.id: classrooms[i % len(classrooms)] for i, g in enumerate(groups)}
-        self.timetable = []
-
-    def solve(self):
-        for group in self.groups:
-            group_tasks = [r for r in self.requirements if r[0].id == group.id]
-            day_buckets = {d: [] for d in self.days}
-
-            group_tasks.sort(key=lambda x: Counter([r[1].id for r in group_tasks])[x[1].id], reverse=True)
-            for i, task in enumerate(group_tasks):
-                target_day = self.days[i % len(self.days)]
-                day_buckets[target_day].append(list(task))
-
-            for day in self.days:
-                for p_idx, task_data in enumerate(day_buckets[day]):
-                    if p_idx >= len(self.periods):
-                        break
-
-                    sub = task_data[1]
-                    name = sub.name.lower()
-
-                    pe_keys = ['pe', 'sport', 'field', 'gym', 'pitch', 'court']
-                    lab_keys = ['science', 'lab', 'chem', 'phys', 'bio', 'ict']
-
-                    if any(k in name for k in pe_keys):
-                        special_rooms = [r for r in self.classrooms if any(k in r.name.lower() for k in pe_keys)]
-                        room = random.choice(special_rooms) if special_rooms else self.classrooms[-1]
-                    elif any(k in name for k in lab_keys):
-                        special_rooms = [r for r in self.classrooms if any(k in r.name.lower() for k in lab_keys)]
-                        room = random.choice(special_rooms) if special_rooms else self.classrooms[-1]
-                    else:
-                        room = self.home_rooms[group.id]
-
-                    self.timetable.append({
-                        'group': group, 'subject': sub,
-                        'teacher': random.choice(task_data[2]),
-                        'room': room, 'period': self.periods[p_idx], 'day': day
-                    })
-
-        for _ in range(200):
-            clashes = 0
-            teacher_usage = {}
-            for i, entry in enumerate(self.timetable):
-                key = (entry['teacher'].id, entry['period'].id, entry['day'])
-                if key in teacher_usage:
-                    clashes += 1
-                    self._swap_to_resolve(i)
-                else:
-                    teacher_usage[key] = i
-            if clashes == 0:
-                break
-        return self.timetable
-
-    def _swap_to_resolve(self, entry_idx):
-        target = self.timetable[entry_idx]
-        candidates = [
-            i for i, e in enumerate(self.timetable)
-            if e['group'].id == target['group'].id and e['day'] == target['day'] and i != entry_idx
-        ]
-        if candidates:
-            swap_idx = random.choice(candidates)
-            self.timetable[entry_idx]['period'], self.timetable[swap_idx]['period'] = \
-                self.timetable[swap_idx]['period'], self.timetable[entry_idx]['period']
+def _int_list(value):
+    if value in (None, ""):
+        return []
+    if not isinstance(value, list):
+        raise ValueError
+    return [int(v) for v in value]
 
 
-def generate_timetable(timetable):
-    school = timetable.school
-    groups = list(StudentGroup.objects.filter(school=school))
-    periods = list(SchedulePeriod.objects.filter(
-        schedule=timetable.schedule, type__in=['lecture', 'lab']
-    ).order_by('order'))
-    classrooms = list(Classroom.objects.filter(school=school))
-
-    if not periods or not classrooms:
-        return Response({"error": "The schedule needs lecture periods and the school needs classrooms."}, status=400)
-
-    needed_tasks = []
-    for group in groups:
-        for req in SubjectRequirement.objects.filter(student_group=group).select_related("subject"):
-            pool = list(Teacher.objects.filter(school=school, subjects=req.subject))
-            if not pool:
-                pool = list(Teacher.objects.filter(school=school))
-            if not pool:
-                return Response({"error": "The school has no teachers."}, status=400)
-            for _ in range(req.lectures_per_week):
-                needed_tasks.append((group, req.subject, pool))
-
-    if not needed_tasks:
-        return Response({"error": "No requirements found for this school/timetable."}, status=400)
-
-    final_entries_data = TimetableSolver(groups, periods, classrooms, DISPLAY_DAYS, needed_tasks).solve()
-
-    with transaction.atomic():
-        TimetableEntry.objects.filter(timetable=timetable).delete()
-        bulk_list = [
-            TimetableEntry(
-                timetable=timetable,
-                student_group=e['group'],
-                subject=e['subject'],
-                teacher=e['teacher'],
-                classroom=e['room'],
-                period=e['period'],
-                day_of_week=e['day']
-            ) for e in final_entries_data
-        ]
-        TimetableEntry.objects.bulk_create(bulk_list)
-
-    return Response({"status": "ok", "message": f"Successfully generated {len(bulk_list)} entries."})
+def start_generation(request, timetable):
+    """POST body (all optional): {"time_limit": 60, "group_ids": [...], "teacher_ids": [...]}"""
+    try:
+        group_ids = _int_list(request.data.get("group_ids"))
+        teacher_ids = _int_list(request.data.get("teacher_ids"))
+        time_limit = request.data.get("time_limit")
+        time_limit = None if time_limit in (None, "") else max(5, min(600, int(time_limit)))
+    except (TypeError, ValueError):
+        return Response({"error": "group_ids/teacher_ids must be lists of ids and time_limit a number."},
+                        status=status.HTTP_400_BAD_REQUEST)
+    running = timetable.jobs.filter(status__in=("queued", "running")).first()
+    if running and expire_stale(running).status in ("queued", "running"):
+        return Response(TimetableJobSerializer(running).data, status=status.HTTP_409_CONFLICT)
+    if not SchedulePeriod.objects.filter(schedule=timetable.schedule, type__in=("lecture", "lab")).exists():
+        return Response({"error": "The schedule has no lesson periods yet."}, status=status.HTTP_400_BAD_REQUEST)
+    if not SubjectRequirement.objects.filter(student_group__school=timetable.school).exists():
+        return Response({"error": "No subject requirements found. Add weekly lessons per group first."},
+                        status=status.HTTP_400_BAD_REQUEST)
+    params = {"group_ids": group_ids, "teacher_ids": teacher_ids}
+    if time_limit:
+        params["time_limit"] = time_limit
+    job = start_job(timetable, request.user, params)
+    return Response(TimetableJobSerializer(job).data, status=status.HTTP_202_ACCEPTED)
 
 
 class GenerateTimetableEntriesAPIView(APIView):
-    """POST /timetables/{id}/generate/"""
+    """POST /timetables/{id}/generate/ (same as the nested route)."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request, timetable_id):
@@ -497,4 +430,40 @@ class GenerateTimetableEntriesAPIView(APIView):
             Timetable.objects.select_related('schedule', 'school'),
             id=timetable_id, school__user=request.user
         )
-        return generate_timetable(timetable)
+        return start_generation(request, timetable)
+
+
+class SolverSettingsView(APIView):
+    """GET/PUT /schools/{school_id}/solver-settings/  {"weights": {...}, "time_limit_seconds": 60}"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, school_id):
+        cfg = solver_settings_for(get_user_school(request.user, school_id))
+        return Response(self._data(cfg))
+
+    def put(self, request, school_id):
+        cfg = solver_settings_for(get_user_school(request.user, school_id))
+        weights = request.data.get("weights", {})
+        if not isinstance(weights, dict):
+            return Response({"error": "weights must be an object."}, status=status.HTTP_400_BAD_REQUEST)
+        clean = {}
+        for key, value in weights.items():
+            if key not in DEFAULT_SOLVER_WEIGHTS:
+                return Response({"error": f"Unknown weight: {key}"}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                clean[key] = max(0, min(100, int(value)))
+            except (TypeError, ValueError):
+                return Response({"error": f"Weight {key} must be a number 0-100."}, status=status.HTTP_400_BAD_REQUEST)
+        cfg.weights = clean
+        if "time_limit_seconds" in request.data:
+            try:
+                cfg.time_limit_seconds = max(5, min(600, int(request.data["time_limit_seconds"])))
+            except (TypeError, ValueError):
+                return Response({"error": "time_limit_seconds must be a number."}, status=status.HTTP_400_BAD_REQUEST)
+        cfg.save()
+        return Response(self._data(cfg))
+
+    @staticmethod
+    def _data(cfg):
+        return {"weights": cfg.effective_weights(), "defaults": DEFAULT_SOLVER_WEIGHTS,
+                "time_limit_seconds": cfg.time_limit_seconds}

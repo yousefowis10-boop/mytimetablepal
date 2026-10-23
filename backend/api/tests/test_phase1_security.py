@@ -3,7 +3,7 @@ from io import StringIO
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from api.models import (
@@ -184,9 +184,12 @@ class OwnSchoolFlowTests(TestCase):
         self.assertEqual(res.status_code, 200, res.content)
         self.assertEqual(self.client.delete(f"/api/schools/{sid}/teachers/{tid}/availability/{aid}/").status_code, 204)
 
+    @override_settings(TIMETABLE_JOBS_SYNC=True)
     def test_generate_endpoint(self):
-        res = self.client.post(f"/api/schools/{self.s['school'].id}/timetables/{self.s['timetable'].id}/generate/")
-        self.assertEqual(res.status_code, 200, res.content)
+        res = self.client.post(f"/api/schools/{self.s['school'].id}/timetables/{self.s['timetable'].id}/generate/",
+                               {"time_limit": 10}, format="json")
+        self.assertEqual(res.status_code, 202, res.content)
+        self.assertEqual(res.json()["status"], "succeeded", res.json())
         self.assertEqual(self.s["timetable"].entries.count(), 3)
 
 
@@ -223,7 +226,7 @@ class SeedDemoTests(TestCase):
         self.assertEqual(school.student_groups.count(), 30)
         self.assertEqual(school.teachers.count(), 55)
         self.assertEqual(school.subjects.count(), 15)
-        self.assertEqual(school.classrooms.count(), 35)
+        self.assertEqual(school.classrooms.count(), 39)
         lessons = SchedulePeriod.objects.filter(schedule__school=school, type="lecture").count()
         self.assertEqual(lessons, 7)
         client = APIClient()

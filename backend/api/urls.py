@@ -29,6 +29,8 @@ urlpatterns = [
     path('timetables/<int:timetable_id>/generate/',
          views.GenerateTimetableEntriesAPIView.as_view(), name='generate-timetable'),
 
+    path('schools/<int:school_id>/solver-settings/', views.SolverSettingsView.as_view(), name='solver-settings'),
+
     path('timetables/<int:timetable_id>/json/',
          views.TimetableJSONView.as_view(), name='timetable-json'),
 ]

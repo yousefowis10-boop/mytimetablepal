@@ -23,30 +23,31 @@ DEMO_SCHOOL_NAME = "Amman Demo School"
 DEMO_ADMIN_EMAIL = "admin@demo.mytimetablepal.com"
 DEFAULT_DEMO_PASSWORD = "DemoSchool-2026"
 
-# (name, code suffix, number of teachers)
+# (name, code suffix, number of teachers, room type needed, heavy = prefer mornings)
 SUBJECTS = [
-    ("Arabic", "ARB", 9),
-    ("English", "ENG", 8),
-    ("Mathematics", "MATH", 9),
-    ("Science", "SCI", 4),
-    ("Physics", "PHY", 2),
-    ("Chemistry", "CHEM", 2),
-    ("Biology", "BIO", 2),
-    ("Islamic Education", "ISL", 5),
-    ("Social Studies", "SOC", 2),
-    ("History", "HIST", 1),
-    ("Geography", "GEO", 1),
-    ("Computer Science", "CS", 3),
-    ("Physical Education", "PE", 3),
-    ("Art", "ART", 3),
-    ("French", "FR", 1),
+    ("Arabic", "ARB", 9, "", False),
+    ("English", "ENG", 8, "", False),
+    ("Mathematics", "MATH", 9, "", True),
+    ("Science", "SCI", 4, "", False),
+    ("Physics", "PHY", 2, "lab", True),
+    ("Chemistry", "CHEM", 2, "lab", True),
+    ("Biology", "BIO", 2, "lab", False),
+    ("Islamic Education", "ISL", 5, "", False),
+    ("Social Studies", "SOC", 2, "", False),
+    ("History", "HIST", 1, "", False),
+    ("Geography", "GEO", 1, "", False),
+    ("Computer Science", "CS", 3, "computer_lab", False),
+    ("Physical Education", "PE", 3, "gym", False),
+    ("Art", "ART", 3, "", False),
+    ("French", "FR", 1, "", False),
 ]
 
-# Weekly lessons per subject code (34 of the 35 weekly slots).
-PRIMARY_PLAN = {"ARB": 7, "ENG": 5, "MATH": 6, "SCI": 4, "ISL": 3, "SOC": 2, "CS": 2, "PE": 2, "ART": 3}
+# Weekly (lessons, double periods) per subject code - 34 of the 35 weekly slots.
+PRIMARY_PLAN = {"ARB": (7, 0), "ENG": (5, 0), "MATH": (6, 0), "SCI": (4, 0), "ISL": (3, 0), "SOC": (2, 0),
+                "CS": (2, 0), "PE": (2, 0), "ART": (3, 1)}
 SECONDARY_PLAN = {
-    "ARB": 5, "ENG": 5, "MATH": 6, "PHY": 3, "CHEM": 3, "BIO": 2, "ISL": 3,
-    "HIST": 2, "GEO": 1, "CS": 2, "PE": 1, "FR": 1,
+    "ARB": (5, 0), "ENG": (5, 0), "MATH": (6, 0), "PHY": (3, 1), "CHEM": (3, 1), "BIO": (2, 0), "ISL": (3, 0),
+    "HIST": (2, 0), "GEO": (1, 0), "CS": (2, 0), "PE": (1, 0), "FR": (1, 0),
 }
 
 FIRST_NAMES = [
@@ -96,7 +97,7 @@ class Command(BaseCommand):
             )
             subjects = self._subjects(school)
             rooms = self._rooms(school)
-            groups = self._groups(school, rooms, subjects)
+            groups = self._groups(school, rooms, subjects, rng)
             teachers = self._teachers(school, subjects, rng)
             schedule, lessons = self._schedule(school)
             self._availability(teachers, lessons, rng)
@@ -127,23 +128,24 @@ class Command(BaseCommand):
         # Subject.code is unique across all schools, so prefix it with the school id.
         return {
             code: Subject.objects.create(
-                school=school, name=name, code=f"S{school.id}-{code}", description=f"{name} curriculum"
+                school=school, name=name, code=code, description=f"{name} curriculum",
+                requires_room_type=room_type, is_heavy=heavy,
             )
-            for name, code, _ in SUBJECTS
+            for name, code, _, room_type, heavy in SUBJECTS
         }
 
     def _rooms(self, school):
         rooms = [Classroom(school=school, name=f"Room {100 + i}", capacity=32) for i in range(1, 31)]
+        rooms += [Classroom(school=school, name=f"Science Lab {i}", capacity=30, room_type="lab") for i in range(1, 5)]
+        rooms += [Classroom(school=school, name=f"Computer Lab {i}", capacity=30, room_type="computer_lab")
+                  for i in range(1, 4)]
         rooms += [
-            Classroom(school=school, name="Science Lab 1", capacity=30),
-            Classroom(school=school, name="Science Lab 2", capacity=30),
-            Classroom(school=school, name="Computer Lab 1", capacity=30),
-            Classroom(school=school, name="Computer Lab 2", capacity=30),
-            Classroom(school=school, name="Sports Hall", capacity=60),
+            Classroom(school=school, name="Sports Hall", capacity=60, room_type="gym"),
+            Classroom(school=school, name="Outdoor Court", capacity=60, room_type="gym"),
         ]
         return Classroom.objects.bulk_create(rooms)
 
-    def _groups(self, school, rooms, subjects):
+    def _groups(self, school, rooms, subjects, rng):
         groups = []
         home_rooms = iter(rooms[:30])
         for grade in range(1, 11):
@@ -154,10 +156,12 @@ class Command(BaseCommand):
                     classroom=next(home_rooms),
                     name=f"Grade {grade}-{section}",
                     description=f"Grade {grade}, section {section}",
+                    size=rng.randint(24, 30),
                 )
                 SubjectRequirement.objects.bulk_create([
-                    SubjectRequirement(student_group=group, subject=subjects[code], lectures_per_week=n)
-                    for code, n in plan.items()
+                    SubjectRequirement(student_group=group, subject=subjects[code], lectures_per_week=n,
+                                       double_periods_per_week=doubles)
+                    for code, (n, doubles) in plan.items()
                 ])
                 groups.append(group)
         return groups
@@ -165,14 +169,15 @@ class Command(BaseCommand):
     def _teachers(self, school, subjects, rng):
         teachers = []
         names = set()
-        for _, code, count in SUBJECTS:
+        for _, code, count, _, _ in SUBJECTS:
             for _ in range(count):
                 while True:
                     name = f"{rng.choice(FIRST_NAMES)} {rng.choice(LAST_NAMES)}"
                     if name not in names:
                         names.add(name)
                         break
-                teacher = Teacher.objects.create(school=school, name=name, experience=rng.randint(1, 25))
+                teacher = Teacher.objects.create(school=school, name=name, experience=rng.randint(1, 25),
+                                                 max_lessons_per_day=6)
                 teacher.subjects.add(subjects[code])
                 teachers.append((teacher, code))
 

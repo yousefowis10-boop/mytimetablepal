@@ -163,3 +163,6 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "root": {"handlers": ["console"], "level": os.getenv("LOG_LEVEL", "INFO")},
 }
+
+# Timetable generator: run jobs inline instead of in a background thread (tests / debugging).
+TIMETABLE_JOBS_SYNC = env_bool("TIMETABLE_JOBS_SYNC", default=False)
