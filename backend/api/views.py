@@ -7,9 +7,10 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .access import STAFF_ROLES, SchoolAccess, SchoolScopedMixin, log
 from .models import (
     School, Teacher, Classroom, Schedule, SchedulePeriod, TeacherAvailablePeriod,
-    Subject, StudentGroup, Timetable, Availability, SubjectRequirement, TimetableJob,
+    Subject, StudentGroup, Timetable, TimetableEntry, Availability, SubjectRequirement, TimetableJob,
     DEFAULT_SOLVER_WEIGHTS,
 )
 from .serializer import (
@@ -24,31 +25,9 @@ from .timetable_jobs import build_problem, expire_stale, solver_settings_for, st
 User = get_user_model()
 
 
-def get_user_school(user, school_id):
-    """Return the school if it belongs to the user, otherwise 404 (never leak existence)."""
-    return get_object_or_404(School, id=school_id, user=user)
-
-
-class SchoolScopedMixin:
-    """For viewsets nested under /schools/<school_id>/: every query is limited to a school the user owns."""
-
-    def get_school(self):
-        if not hasattr(self, "_school"):
-            self._school = get_user_school(self.request.user, self.kwargs.get("school_id"))
-        return self._school
-
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        if self.kwargs.get("school_id"):
-            context["school"] = self.get_school()
-        return context
-
-    def perform_create(self, serializer):
-        serializer.save(school=self.get_school())
-
-
 # ============== AUTH ==============
 class RegisterView(generics.CreateAPIView):
+    """Create a user account only (parents/teachers then join a school with an invitation code)."""
     serializer_class = RegisterSerializer
     authentication_classes = []
     permission_classes = [AllowAny]
@@ -65,23 +44,39 @@ class HealthView(APIView):
 
 # ============== SCHOOL ==============
 class SchoolViewSet(viewsets.ModelViewSet):
+    """Schools the user is a member of. Creating one makes the user its admin and starts a 30-day trial."""
     permission_classes = [IsAuthenticated]
     serializer_class = SchoolSerializer
 
     def get_queryset(self):
-        return School.objects.filter(user=self.request.user)
+        return (School.objects.filter(memberships__user=self.request.user, memberships__is_active=True)
+                .select_related("plan").distinct().order_by("name"))
+
+    def get_object(self):
+        access = SchoolAccess(self.request, self.kwargs["pk"], read_roles=("admin", "staff", "teacher", "parent", "driver"),
+                              write_roles=("admin",))
+        return access.school
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        from .platform import create_school_for
+        school = create_school_for(self.request.user, serializer.validated_data)
+        serializer.instance = school
+
+    def perform_update(self, serializer):
+        from .access import _snapshot
+        before = _snapshot(serializer.instance)
+        school = serializer.save()
+        log(school, self.request.user, "update", school, before=before)
 
 
 # ============== STUDENT GROUP ==============
 class StudentGroupViewSet(SchoolScopedMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = StudentGroupSerializer
+    write_roles = ("admin", "staff")
 
     def get_queryset(self):
-        return StudentGroup.objects.filter(school=self.get_school()).select_related("classroom")
+        return StudentGroup.objects.filter(school=self.get_school()).select_related("classroom").order_by("name")
 
     @action(detail=True, methods=['get'])
     def requirements(self, request, pk=None, school_id=None):
@@ -95,9 +90,10 @@ class StudentGroupViewSet(SchoolScopedMixin, viewsets.ModelViewSet):
 class TeacherViewSet(SchoolScopedMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = TeacherSerializer
+    write_roles = ("admin", "staff")
 
     def get_queryset(self):
-        return Teacher.objects.filter(school=self.get_school()).prefetch_related("subjects")
+        return Teacher.objects.filter(school=self.get_school()).prefetch_related("subjects").order_by("name")
 
     @action(detail=True, methods=['get', 'post'])
     def availability(self, request, pk=None, school_id=None):
@@ -136,9 +132,10 @@ class TeacherViewSet(SchoolScopedMixin, viewsets.ModelViewSet):
 class ClassroomViewSet(SchoolScopedMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = ClassroomSerializer
+    write_roles = ("admin", "staff")
 
     def get_queryset(self):
-        return Classroom.objects.filter(school=self.get_school())
+        return Classroom.objects.filter(school=self.get_school()).order_by("name")
 
 
 # ============== SCHEDULE ==============
@@ -186,18 +183,25 @@ class ScheduleViewSet(SchoolScopedMixin, viewsets.ModelViewSet):
 class SubjectViewSet(SchoolScopedMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = SubjectSerializer
+    write_roles = ("admin", "staff")
 
     def get_queryset(self):
-        return Subject.objects.filter(school=self.get_school())
+        return Subject.objects.filter(school=self.get_school()).order_by("name")
 
 
 # ============== TIMETABLE ==============
 class TimetableViewSet(SchoolScopedMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = TimetableSerializer
+    audit_model = True
+
+    def roles_for_action(self):
+        if self.action in ("generate", "precheck", "jobs", "job_detail"):
+            self.module = "timetable"
+        return self.read_roles, self.write_roles
 
     def get_queryset(self):
-        return Timetable.objects.filter(school=self.get_school())
+        return Timetable.objects.filter(school=self.get_school()).order_by("-is_active", "-id")
 
     @action(detail=True, methods=['get'])
     def entries(self, request, pk=None, school_id=None):
@@ -205,6 +209,20 @@ class TimetableViewSet(SchoolScopedMixin, viewsets.ModelViewSet):
         timetable = self.get_object()
         entries = timetable.entries.select_related("teacher", "subject", "classroom", "period")
         return Response(TimetableEntrySerializer(entries, many=True).data)
+
+    @action(detail=True, methods=['patch'], url_path=r'entries/(?P<entry_id>\d+)')
+    def entry_detail(self, request, pk=None, school_id=None, entry_id=None):
+        """PATCH .../timetables/{id}/entries/{entry_id}/ - e.g. {"locked": true} or {"covering_teacher": 5}"""
+        timetable = self.get_object()
+        entry = get_object_or_404(TimetableEntry, id=entry_id, timetable=timetable)
+        from .access import _snapshot
+        before = _snapshot(entry)
+        serializer = TimetableEntrySerializer(entry, data=request.data, partial=True,
+                                              context={"timetable": timetable, "school": timetable.school})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        log(timetable.school, request.user, "update", entry, before=before)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
     def bulk_update_entries(self, request, pk=None, school_id=None):
@@ -222,8 +240,12 @@ class TimetableViewSet(SchoolScopedMixin, viewsets.ModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
+            before = timetable.entries.count()
             timetable.entries.all().delete()
             serializer.save()
+        log(timetable.school, request.user, "update", timetable,
+            summary=f"Timetable '{timetable.name}' edited: {before} -> {len(entries_data)} lessons",
+            model="api.TimetableEntry", object_id=str(timetable.id))
         return Response({"message": "Timetable entries updated successfully."},
                         status=status.HTTP_201_CREATED)
 
@@ -265,9 +287,9 @@ class SubjectRequirementViewSet(viewsets.ModelViewSet):
 
     def get_group(self):
         if not hasattr(self, "_group"):
-            self._group = get_object_or_404(
-                StudentGroup, id=self.kwargs.get('student_group_id'), school__user=self.request.user
-            )
+            group = get_object_or_404(StudentGroup, id=self.kwargs.get('student_group_id'))
+            SchoolAccess(self.request, group.school_id, write_roles=("admin", "staff"))
+            self._group = group
         return self._group
 
     def get_queryset(self):
@@ -291,10 +313,9 @@ class TeacherAvailabilityPeriodAPI(APIView):
     permission_classes = [IsAuthenticated]
 
     def get_period(self, request, period_id):
-        return get_object_or_404(
-            SchedulePeriod.objects.select_related("schedule"),
-            id=period_id, schedule__school__user=request.user
-        )
+        period = get_object_or_404(SchedulePeriod.objects.select_related("schedule"), id=period_id)
+        SchoolAccess(request, period.schedule.school_id, write_roles=("admin", "staff"))
+        return period
 
     def get(self, request, period_id):
         """GET /periods/{period_id}/teacher_availability/"""
@@ -328,36 +349,37 @@ class TeacherAvailabilityPeriodAPI(APIView):
 
 
 # ============== TIMETABLE SPECIAL VIEWS ==============
-DISPLAY_DAYS = [7, 1, 2, 3, 4]  # Sunday..Thursday
-
-
-def build_timetable_pages(timetable, view_type):
-    """One page per group / teacher / room, each a grid of periods x days."""
+def build_timetable_pages(timetable, view_type, owner_ids=None):
+    """One page per group / teacher / room, each a grid of periods x school days."""
     periods = list(timetable.schedule.periods.all())
+    days = timetable.school.week_day_list
     entries = list(timetable.entries.select_related(
         "teacher", "covering_teacher", "subject", "classroom", "student_group"
     ))
 
     if view_type == "teacher":
-        key, title, extra = "teacher", "Teacher", "student_group"
+        key, title = "teacher", "Teacher"
     elif view_type == "room":
-        key, title, extra = "classroom", "Room", "student_group"
+        key, title = "classroom", "Room"
     else:
-        key, title, extra = "student_group", "Grade", "teacher"
+        key, title = "student_group", "Grade"
 
     grid = {}
     owners = {}
     for e in entries:
         owner = getattr(e, key)
+        if owner_ids is not None and owner.id not in owner_ids:
+            continue
         owners[owner.id] = owner
         grid[(owner.id, e.day_of_week, e.period_id)] = e
 
     pages = []
     for owner in sorted(owners.values(), key=lambda o: o.name):
-        page = {"title": f"{title}: {owner.name}", "periods": []}
+        page = {"title": f"{title}: {owner.name}", "owner_id": owner.id, "periods": []}
         for p in periods:
-            row = {"period": p.name, "days": []}
-            for day in DISPLAY_DAYS:
+            row = {"period": p.name, "type": p.type, "start": str(p.start_time)[:5], "end": str(p.end_time)[:5],
+                   "days": []}
+            for day in days:
                 e = grid.get((owner.id, day, p.id))
                 cell = {
                     "day": day,
@@ -376,7 +398,7 @@ def build_timetable_pages(timetable, view_type):
                 row["days"].append(cell)
             page["periods"].append(row)
         pages.append(page)
-    return {"pages": pages}
+    return {"pages": pages, "days": days, "school": timetable.school.name}
 
 
 class TimetableJSONView(APIView):
@@ -384,7 +406,8 @@ class TimetableJSONView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, timetable_id):
-        timetable = get_object_or_404(Timetable, id=timetable_id, school__user=request.user)
+        timetable = get_object_or_404(Timetable.objects.select_related("school"), id=timetable_id)
+        SchoolAccess(request, timetable.school_id)
         return Response(build_timetable_pages(timetable, request.GET.get("type", "grade")))
 
 
@@ -417,6 +440,7 @@ def start_generation(request, timetable):
     params = {"group_ids": group_ids, "teacher_ids": teacher_ids}
     if time_limit:
         params["time_limit"] = time_limit
+    log(timetable.school, request.user, "generate", timetable, summary=f"Generate '{timetable.name}' {params}")
     job = start_job(timetable, request.user, params)
     return Response(TimetableJobSerializer(job).data, status=status.HTTP_202_ACCEPTED)
 
@@ -426,10 +450,8 @@ class GenerateTimetableEntriesAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, timetable_id):
-        timetable = get_object_or_404(
-            Timetable.objects.select_related('schedule', 'school'),
-            id=timetable_id, school__user=request.user
-        )
+        timetable = get_object_or_404(Timetable.objects.select_related('schedule', 'school'), id=timetable_id)
+        SchoolAccess(request, timetable.school_id, module="timetable")
         return start_generation(request, timetable)
 
 
@@ -438,11 +460,11 @@ class SolverSettingsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, school_id):
-        cfg = solver_settings_for(get_user_school(request.user, school_id))
+        cfg = solver_settings_for(SchoolAccess(request, school_id).school)
         return Response(self._data(cfg))
 
     def put(self, request, school_id):
-        cfg = solver_settings_for(get_user_school(request.user, school_id))
+        cfg = solver_settings_for(SchoolAccess(request, school_id, module="timetable").school)
         weights = request.data.get("weights", {})
         if not isinstance(weights, dict):
             return Response({"error": "weights must be an object."}, status=status.HTTP_400_BAD_REQUEST)

@@ -60,6 +60,8 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "corsheaders",
     "api",
+    "ops",
+    "transport",
 ]
 
 MIDDLEWARE = [
@@ -166,3 +168,15 @@ LOGGING = {
 
 # Timetable generator: run jobs inline instead of in a background thread (tests / debugging).
 TIMETABLE_JOBS_SYNC = env_bool("TIMETABLE_JOBS_SYNC", default=False)
+
+# Notifications
+NOTIFY_SYNC = env_bool("NOTIFY_SYNC", default=False)
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", default=True)
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "MyTimetablePal <no-reply@mytimetablepal.com>")
+EMAIL_BACKEND = ("django.core.mail.backends.smtp.EmailBackend" if EMAIL_HOST
+                 else "django.core.mail.backends.console.EmailBackend")
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024

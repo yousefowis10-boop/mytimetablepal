@@ -66,7 +66,7 @@ class StudentGroupSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StudentGroup
-        fields = ["id", "name", "description", "size", "school", "classroom_id", "classroom"]
+        fields = ["id", "name", "description", "size", "grade_level", "school", "classroom_id", "classroom"]
         read_only_fields = ['school']
 
 
@@ -101,18 +101,69 @@ class TeacherSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Teacher
-        fields = ['id', 'name', 'experience', 'school', 'school_name', 'subjects', 'subject_names',
+        fields = ['id', 'name', 'experience', 'school', 'school_name', 'subjects', 'subject_names', 'phone', 'email', 'user',
                   'max_lessons_per_day', 'max_lessons_per_week']
-        read_only_fields = ['school']
+        read_only_fields = ['school', 'user']
 
     def get_subject_names(self, obj):
         return [subject.name for subject in obj.subjects.all()]
 
 
+LOGO_PREFIXES = ("data:image/png;base64,", "data:image/jpeg;base64,", "data:image/webp;base64,")
+
+
 class SchoolSerializer(serializers.ModelSerializer):
+    plan_name = serializers.CharField(source="plan.name", read_only=True, default=None)
+    modules = serializers.SerializerMethodField()
+    roles = serializers.SerializerMethodField()
+    max_students = serializers.IntegerField(read_only=True)
+    trial_expired = serializers.BooleanField(read_only=True)
+    address = serializers.CharField(required=False, allow_blank=True, default="")
+    principal_name = serializers.CharField(required=False, allow_blank=True, default="")
+    established_year = serializers.IntegerField(required=False, default=2000)
+
     class Meta:
         model = School
-        fields = ["id", "name", "address", "principal_name", "established_year", "week_days"]
+        fields = ["id", "name", "address", "principal_name", "established_year", "week_days",
+                  "city", "phone", "email", "logo", "brand_color", "currency", "default_language",
+                  "attendance_mode", "absence_alert_threshold", "pass_mark", "grading_scale",
+                  "fee_reminder_days_before", "fee_reminder_days_after", "latitude", "longitude",
+                  "status", "plan_name", "trial_ends_at", "trial_expired", "modules", "max_students", "roles"]
+        read_only_fields = ["status", "trial_ends_at"]
+
+    def get_modules(self, obj):
+        return sorted(obj.enabled_modules)
+
+    def get_roles(self, obj):
+        from .access import roles_for
+        request = self.context.get("request")
+        return sorted(roles_for(request.user, obj)) if request else []
+
+    def validate_logo(self, value):
+        if not value:
+            return ""
+        if not value.startswith(LOGO_PREFIXES):
+            raise serializers.ValidationError("Upload a PNG, JPEG or WebP image.")
+        if len(value) > 450_000:
+            raise serializers.ValidationError("Logo is too large; please use an image under 300 KB.")
+        return value
+
+    def validate_brand_color(self, value):
+        import re
+        if value and not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+            raise serializers.ValidationError("Use a colour like #2563eb.")
+        return value
+
+    def validate_currency(self, value):
+        if not value.isalpha() or len(value) != 3:
+            raise serializers.ValidationError("Use a 3-letter currency code such as JOD.")
+        return value.upper()
+
+    def validate_grading_scale(self, value):
+        if not isinstance(value, list) or any(
+                not isinstance(b, dict) or "min" not in b or "label" not in b for b in value):
+            raise serializers.ValidationError('Use a list like [{"min": 90, "label": "A"}].')
+        return sorted(value, key=lambda b: -float(b["min"]))
 
     def validate_week_days(self, value):
         try:
