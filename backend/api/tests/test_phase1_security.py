@@ -247,3 +247,18 @@ class TimetableEntryFormatTests(TestCase):
                    ("day_of_week", "period", "teacher", "subject", "classroom", "student_group", "covering_teacher")}
         res = client.post(f"{base}/bulk_update_entries/", {"entries": [payload]}, format="json")
         self.assertEqual(res.status_code, 201, res.content)
+
+
+class SeedIfMissingTests(TestCase):
+    def test_if_missing_respects_flag_and_existing_data(self):
+        import os
+        from unittest import mock
+        with mock.patch.dict(os.environ, {"SEED_DEMO": ""}):
+            call_command("seed_demo", "--if-missing", stdout=StringIO())
+        self.assertFalse(School.objects.exists())
+        with mock.patch.dict(os.environ, {"SEED_DEMO": "true"}):
+            call_command("seed_demo", "--if-missing", stdout=StringIO())
+            school = School.objects.get()
+            Classroom.objects.create(school=school, name="Kept", capacity=5)
+            call_command("seed_demo", "--if-missing", stdout=StringIO())
+        self.assertTrue(Classroom.objects.filter(name="Kept").exists())

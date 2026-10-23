@@ -75,6 +75,7 @@ GitHub Actions runs both on every push (`.github/workflows/ci.yml`).
 | `CORS_ALLOWED_ORIGINS` | yes | `https://mytimetablepal.vercel.app` | The frontend URL(s), comma-separated, with `https://`, no trailing slash. |
 | `CSRF_TRUSTED_ORIGINS` | no | `https://api.example.com` | Only needed for the Django admin on a custom domain. |
 | `DEMO_PASSWORD` | no | `DemoSchool-2026` | Password used by `seed_demo`. |
+| `SEED_DEMO` | no | `true` | On deploy, create the demo school if it is missing. |
 | `JWT_ACCESS_HOURS` / `JWT_REFRESH_DAYS` | no | `12` / `7` | Login token lifetimes. |
 
 ### Frontend (`frontend/.env.local`, or Vercel project env vars)
@@ -88,11 +89,11 @@ GitHub Actions runs both on every push (`.github/workflows/ci.yml`).
 ### Backend + database on Railway
 
 1. railway.com → **New Project** → **Deploy from GitHub repo** → pick `mytimetablepal`.
-2. Open the new service → **Settings** → **Root Directory** = `backend`. Railway then uses `backend/railway.json`: it collects static files at build time, runs `migrate` before each deploy, starts gunicorn, and health-checks `/api/health/`.
+2. Open the new service → **Settings** → **Root Directory** = `backend`. Railway then uses `railway.json` (repo root): it collects static files at build time, runs `migrate` before each deploy, starts gunicorn, and health-checks `/api/health/`.
 3. In the project canvas: **+ Create** → **Database** → **PostgreSQL**.
 4. Service → **Variables**: add `SECRET_KEY` (new random value), `DEBUG=False`, `DATABASE_URL=${{Postgres.DATABASE_URL}}`, `CORS_ALLOWED_ORIGINS=<your Vercel URL>`.
 5. Service → **Settings** → **Networking** → **Generate Domain**.
-6. Seed the demo data once: service → **⋯** → **Railway Shell** (or `railway run` from the CLI) → `python manage.py seed_demo`.
+6. Demo data: set `SEED_DEMO=true` and the pre-deploy step runs `seed_demo --if-missing` (creates the demo school only if it does not exist yet).
 
 ### Frontend on Vercel
 
@@ -109,7 +110,7 @@ backend/
   api/                     models, serializers, views, urls, tests
   api/management/commands/seed_demo.py
   rest_app/settings.py     all config from environment variables
-  railway.json, Procfile   deploy/start commands
+  Procfile                 start commands (Railway uses /railway.json)
 frontend/
   src/config/api.js        reads VITE_API_URL
   src/services/api.js      REST client used by the pages

@@ -64,7 +64,22 @@ LAST_NAMES = [
 class Command(BaseCommand):
     help = "Create the demo school, its timetable data and the demo login(s)."
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--if-missing",
+            action="store_true",
+            help="Deploy mode: do nothing unless SEED_DEMO=true and the demo school does not exist yet.",
+        )
+
     def handle(self, *args, **options):
+        if options["if_missing"]:
+            if os.getenv("SEED_DEMO", "").lower() not in ("1", "true", "yes"):
+                self.stdout.write("SEED_DEMO is not enabled; skipping demo seed.")
+                return
+            if School.objects.filter(user__username=DEMO_ADMIN_EMAIL, name=DEMO_SCHOOL_NAME).exists():
+                self.stdout.write("Demo school already exists; skipping demo seed.")
+                return
+
         password = os.getenv("DEMO_PASSWORD", DEFAULT_DEMO_PASSWORD)
         rng = random.Random(2026)
 
