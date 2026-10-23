@@ -45,6 +45,9 @@ RAILWAY_PUBLIC_DOMAIN = os.getenv("RAILWAY_PUBLIC_DOMAIN")
 if RAILWAY_PUBLIC_DOMAIN:
     ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
     CSRF_TRUSTED_ORIGINS.append(f"https://{RAILWAY_PUBLIC_DOMAIN}")
+if os.getenv("RAILWAY_ENVIRONMENT_NAME") or os.getenv("RAILWAY_ENVIRONMENT"):
+    # Host header used by Railway's deploy health check.
+    ALLOWED_HOSTS.append("healthcheck.railway.app")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
