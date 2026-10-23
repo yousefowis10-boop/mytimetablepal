@@ -18,6 +18,8 @@ import os
 
 import requests
 
+from api.scheduling.messages import Msg
+
 log = logging.getLogger(__name__)
 TIMEOUT = 25
 
@@ -180,7 +182,8 @@ def cached_matrix(provider_name, points):
         dur, dist = provider.matrix(points)
     except (RoutingError, requests.RequestException, ValueError, KeyError) as exc:
         log.warning("Routing provider %s failed, using estimate: %s", provider.name, exc)
-        note = f"Road distances from {provider.name} were unavailable ({exc}); straight-line estimates were used."
+        note = Msg("Road distances from %(provider)s were unavailable (%(error)s); straight-line estimates were used.",
+                   provider=provider.name, error=str(exc)[:120])
         provider = HaversineProvider()
         dur, dist = provider.matrix(points)
         return dur, dist, provider.name, note

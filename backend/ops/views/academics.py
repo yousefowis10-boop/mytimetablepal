@@ -2,6 +2,7 @@ from collections import defaultdict
 from datetime import timedelta
 from decimal import Decimal
 
+from django.utils.translation import gettext as _
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -12,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.access import SchoolAccess, log
+from api.scheduling.messages import Msg
 from api.models import TimetableEntry
 
 from ..common import ALL_ROLES, MANAGERS, SchoolModelViewSet, active_timetable, my_children, parse_date, teacher_for
@@ -57,18 +59,18 @@ class HomeworkViewSet(SchoolModelViewSet):
         d = serializer.validated_data
         teacher = teaches(self.request.user, access.school, d["group"], d["subject"])
         if not access.is_manager and not teacher:
-            raise PermissionDenied("You can only set homework for groups and subjects you teach.")
+            raise PermissionDenied(_("You can only set homework for groups and subjects you teach."))
         hw = serializer.save(school=access.school, teacher=teacher or teacher_for(self.request.user, access.school))
         from api.notify import notify
         from ..common import guardian_users
         students = Student.objects.filter(group=hw.group, is_active=True)
-        notify(access.school, guardian_users(students), "homework", f"Homework: {hw.subject.name}",
-               f"{hw.title} - due {hw.due_date:%A %d %B}", link="/homework", channels=("push",))
+        notify(access.school, guardian_users(students), "homework", Msg("Homework: %(subject)s", subject=hw.subject.name),
+               Msg("%(title)s - due %(day)s", title=hw.title, day=hw.due_date), link="/homework", channels=("push",))
 
     def perform_update(self, serializer):
         access = self.get_access()
         if not access.is_manager and serializer.instance.teacher and serializer.instance.teacher.user_id != self.request.user.id:
-            raise PermissionDenied("Not your homework.")
+            raise PermissionDenied(_("Not your homework."))
         serializer.save()
 
 
@@ -106,7 +108,7 @@ class AssessmentViewSet(SchoolModelViewSet):
         d = serializer.validated_data
         teacher = teaches(self.request.user, access.school, d["group"], d["subject"])
         if not access.is_manager and not teacher:
-            raise PermissionDenied("You can only grade groups and subjects you teach.")
+            raise PermissionDenied(_("You can only grade groups and subjects you teach."))
         obj = serializer.save(school=access.school, teacher=teacher)
         self.audit("create", obj)
 
@@ -121,12 +123,12 @@ class AssessmentViewSet(SchoolModelViewSet):
             with transaction.atomic():
                 for r in rows:
                     if r.get("student") not in ids:
-                        raise ValidationError({"grades": f"Student {r.get('student')} is not in {a.group.name}."})
+                        raise ValidationError({"grades": _("Student %(student)s is not in %(group)s.") % {"student": r.get("student"), "group": a.group.name}})
                     score = r.get("score")
                     if score not in (None, ""):
                         score = Decimal(str(score))
                         if score < 0 or score > a.max_score:
-                            raise ValidationError({"grades": f"Scores must be between 0 and {a.max_score}."})
+                            raise ValidationError({"grades": _("Scores must be between 0 and %(max)s.") % {"max": a.max_score}})
                     else:
                         score = None
                     old = Grade.objects.filter(assessment=a, student_id=r["student"]).first()
@@ -184,7 +186,7 @@ class ReportCardView(APIView):
         term = terms.filter(id=request.query_params.get("term")).first() if request.query_params.get("term") \
             else terms.filter(start_date__lte=timezone.localdate()).order_by("-start_date").first() or terms.first()
         if not term:
-            raise ValidationError("No terms are set up yet.")
+            raise ValidationError(_("No terms are set up yet."))
         results = subject_results(student, term)
         att = attendance_stats(school, [student], term.start_date, term.end_date).get(student.id, {})
         pcts = [r["percentage"] for r in results.values() if r["percentage"] is not None]

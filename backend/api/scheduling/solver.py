@@ -22,6 +22,8 @@ from dataclasses import dataclass, field
 
 from ortools.sat.python import cp_model
 
+from .messages import Msg
+
 INTERLEAVE = True
 DET_PER_SECOND = 0.3
 
@@ -35,11 +37,11 @@ DEFAULT_WEIGHTS = {
 }
 
 ROOM_TYPE_LABELS = {
-    "regular": "regular classroom",
-    "lab": "science lab",
-    "computer_lab": "computer lab",
-    "gym": "gym / sports area",
-    "other": "special room",
+    "regular": Msg("regular classroom"),
+    "lab": Msg("science lab"),
+    "computer_lab": Msg("computer lab"),
+    "gym": Msg("gym / sports area"),
+    "other": Msg("special room"),
 }
 
 DAY_NAMES = {1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday", 5: "Friday", 6: "Saturday", 7: "Sunday"}
@@ -230,7 +232,7 @@ def precheck(p: Problem) -> list:
     reasons = []
     lesson_slots = len(ix.slots)
     if not ix.periods or not ix.days:
-        return ["The bell schedule has no lesson periods (or the school week has no days), so nothing can be scheduled."]
+        return [Msg("The bell schedule has no lesson periods (or the school week has no days), so nothing can be scheduled.")]
 
     group_total = defaultdict(int)
     for req in p.requirements:
@@ -238,7 +240,8 @@ def precheck(p: Problem) -> list:
     for gid, total in sorted(group_total.items()):
         g = ix.group[gid]
         if total > lesson_slots:
-            reasons.append(f"{g.name} needs {total} lessons a week but the week only has {lesson_slots} lesson periods.")
+            reasons.append(Msg("%(group)s needs %(n)s lessons a week but the week only has %(slots)s lesson periods.",
+                               group=g.name, n=total, slots=lesson_slots))
 
     room_type_demand = defaultdict(int)
     subject_demand = defaultdict(int)
@@ -249,23 +252,26 @@ def precheck(p: Problem) -> list:
             continue
         teachers = ix.qualified(req.subject_id)
         if not teachers:
-            reasons.append(f"{g.name} needs {s.name} but no teacher is qualified to teach {s.name}.")
+            reasons.append(Msg("%(group)s needs %(subject)s but no teacher is qualified to teach %(subject)s.",
+                               group=g.name, subject=s.name))
             continue
         rooms, _ = ix.room_candidates(req)
         if not rooms:
             if s.requires_room_type:
                 label = ROOM_TYPE_LABELS.get(s.requires_room_type, s.requires_room_type)
-                reasons.append(f"{g.name} ({g.size} students) needs a {label} for {s.name}, "
-                               f"but no {label} holds {g.size} students.")
+                reasons.append(Msg("%(group)s (%(size)s students) needs a %(room)s for %(subject)s, but no %(room)s "
+                                   "holds %(size)s students.", group=g.name, size=g.size, room=label, subject=s.name))
             else:
-                reasons.append(f"{g.name} has {g.size} students but no classroom is big enough.")
+                reasons.append(Msg("%(group)s has %(size)s students but no classroom is big enough.",
+                                   group=g.name, size=g.size))
         if req.doubles:
             if 2 * req.doubles > req.lessons:
-                reasons.append(f"{g.name} {s.name} asks for {req.doubles} double periods "
-                               f"({2 * req.doubles} lessons) but has only {req.lessons} lessons a week.")
+                reasons.append(Msg("%(group)s %(subject)s asks for %(doubles)s double periods (%(needed)s lessons) "
+                                   "but has only %(n)s lessons a week.", group=g.name, subject=s.name,
+                                   doubles=req.doubles, needed=2 * req.doubles, n=req.lessons))
             if not ix.pairs:
-                reasons.append("The bell schedule has no two back-to-back lesson periods, so double periods "
-                               f"(asked for {g.name} {s.name}) are impossible.")
+                reasons.append(Msg("The bell schedule has no two back-to-back lesson periods, so double periods "
+                                   "(asked for %(group)s %(subject)s) are impossible.", group=g.name, subject=s.name))
         free_group_slots = {(d, pid) for d, pid in ix.slots if (g.id, d, pid) not in ix.fixed_group}
         teacher_slots = set()
         for t in teachers:
@@ -273,8 +279,9 @@ def precheck(p: Problem) -> list:
         usable = len(free_group_slots & teacher_slots)
         if usable < rem:
             names = " / ".join(t.name for t in teachers[:3]) + (" ..." if len(teachers) > 3 else "")
-            reasons.append(f"{g.name} needs {rem} {s.name} lessons but the only {s.name} teachers ({names}) "
-                           f"are available in {usable} free periods for that group.")
+            reasons.append(Msg("%(group)s needs %(n)s %(subject)s lessons but the only %(subject)s teachers "
+                               "(%(teachers)s) are available in %(free)s free periods for that group.",
+                               group=g.name, n=rem, subject=s.name, teachers=names, free=usable))
         if s.requires_room_type:
             room_type_demand[s.requires_room_type] += rem
         subject_demand[req.subject_id] += rem
@@ -284,16 +291,17 @@ def precheck(p: Problem) -> list:
         teachers = ix.qualified(sid)
         capacity = sum(ix.teacher_capacity(t) for t in teachers)
         if teachers and demand > capacity:
-            reasons.append(f"{s.name} needs {demand} lessons a week in total, but its {len(teachers)} qualified "
-                           f"teacher(s) can give at most {capacity} (availability and weekly limits).")
+            reasons.append(Msg("%(subject)s needs %(n)s lessons a week in total, but its %(teachers)s qualified "
+                               "teacher(s) can give at most %(capacity)s (availability and weekly limits).",
+                               subject=s.name, n=demand, teachers=len(teachers), capacity=capacity))
 
     for rtype, demand in sorted(room_type_demand.items()):
         rooms = [r for r in p.rooms if r.room_type == rtype]
         free = sum(1 for r in rooms for d, pid in ix.slots if (r.id, d, pid) not in ix.fixed_room)
         if demand > free:
             label = ROOM_TYPE_LABELS.get(rtype, rtype)
-            reasons.append(f"Lessons needing a {label}: {demand} a week, but the {len(rooms)} {label}(s) "
-                           f"offer only {free} free periods.")
+            reasons.append(Msg("Lessons needing a %(room)s: %(n)s a week, but the %(rooms)s room(s) of that type "
+                               "offer only %(free)s free periods.", room=label, n=demand, rooms=len(rooms), free=free))
     return reasons
 
 
@@ -357,8 +365,8 @@ def _assign_teachers(ix: _Index, time_limit: float, seed: int, workers: int):
     status = solver.Solve(m)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         return None, {"stage1_status": solver.StatusName(status)}, [
-            "Not enough teacher time: the qualified teachers' availability and weekly limits cannot cover every "
-            "group's lessons at once. Add teachers, widen availability, or reduce lessons per week."
+            Msg("Not enough teacher time: the qualified teachers' availability and weekly limits cannot cover every "
+                "group's lessons at once. Add teachers, widen availability, or reduce lessons per week.")
         ]
     plan = defaultdict(list)
     for (i, tid), var in sorted(n.items()):
@@ -570,13 +578,17 @@ def _diagnose(ix: _Index, plan, seconds: float):
             continue
         seen.add(key)
         g, s = ix.group[req.group_id], ix.subject[req.subject_id]
-        extra = f" ({doubles} as double periods)" if doubles else ""
-        reasons.append(f"{g.name}: {req.lessons} {s.name} lessons{extra} with {t.name}")
+        if doubles:
+            reasons.append(Msg("%(group)s: %(n)s %(subject)s lessons (%(doubles)s as double periods) with %(teacher)s",
+                               group=g.name, n=req.lessons, subject=s.name, doubles=doubles, teacher=t.name))
+        else:
+            reasons.append(Msg("%(group)s: %(n)s %(subject)s lessons with %(teacher)s",
+                               group=g.name, n=req.lessons, subject=s.name, teacher=t.name))
     if not reasons:
         return []
-    return ["These lessons cannot all be placed together without a clash "
-            "(same group, teacher or room at the same time, or outside teacher availability): "
-            + "; ".join(reasons[:12]) + (" ..." if len(reasons) > 12 else "") + "."]
+    return [Msg("These lessons cannot all be placed together without a clash (same group, teacher or room at the "
+                "same time, or outside teacher availability): %(lessons)s.",
+                lessons="; ".join(reasons[:12]) + (" ..." if len(reasons) > 12 else ""))] + reasons[:12]
 
 
 def _polish(ix: _Index, lessons: list, strict: bool, max_passes: int = 12, wall_limit: float = 60.0):
@@ -758,13 +770,13 @@ def solve(p: Problem, on_progress=None) -> Result:
     limit = max(1.0, float(p.time_limit))
     stage1_limit = min(5.0, max(1.0, limit * 0.1))
     if on_progress:
-        on_progress(0.02, "Assigning teachers")
+        on_progress(0.02, Msg("Assigning teachers"))
     plan, stats, reasons = _assign_teachers(ix, stage1_limit, p.seed, p.workers)
     if plan is None:
         return Result("infeasible", reasons=reasons, stats=stats)
 
     if on_progress:
-        on_progress(0.1, "Placing lessons")
+        on_progress(0.1, Msg("Placing lessons"))
 
     def run(strict, seconds, lo, hi):
         model, units_, x_, room_vars_, penalties_, _ = _build_placement(ix, plan, strict_spread=strict)
@@ -779,7 +791,7 @@ def solve(p: Problem, on_progress=None) -> Result:
 
         def cb(count, objective, wall):
             if on_progress:
-                on_progress(lo + (hi - lo) * min(1.0, wall / seconds), f"Found solution #{count} (penalty {int(objective)})")
+                on_progress(lo + (hi - lo) * min(1.0, wall / seconds), Msg("Found solution #%(n)s (penalty %(penalty)s)", n=count, penalty=int(objective)))
 
         st = solver_.Solve(model, _Progress(cb))
         stats["variables"] = len(model.Proto().variables)
@@ -799,13 +811,13 @@ def solve(p: Problem, on_progress=None) -> Result:
     if status == cp_model.INFEASIBLE:
         diag = _diagnose(ix, plan, min(30.0, limit))
         return Result("infeasible", reasons=diag or [
-            "No timetable satisfies all the rules together. Check teacher availability, room types and "
-            "lessons per week for the busiest groups and teachers."
+            Msg("No timetable satisfies all the rules together. Check teacher availability, room types and "
+                "lessons per week for the busiest groups and teachers.")
         ], stats=stats)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         return Result("timeout", reasons=[
-            f"No valid timetable was found within {int(limit)} seconds. Try a longer time limit, or check the "
-            "busiest teachers and rooms."
+            Msg("No valid timetable was found within %(seconds)s seconds. Try a longer time limit, or check the "
+                "busiest teachers and rooms.", seconds=int(limit))
         ], stats=stats)
 
     lessons = []
@@ -816,7 +828,7 @@ def solve(p: Problem, on_progress=None) -> Result:
             lessons.append(Lesson(req.group_id, req.subject_id, t.id, room_id, s[0], s[1]))
     lessons.sort(key=lambda le: (le.group_id, le.day, ix.period_pos[le.period_id]))
     if on_progress:
-        on_progress(0.97, "Polishing")
+        on_progress(0.97, Msg("Polishing"))
     lessons, polish_stats = _polish(ix, lessons, strict=stats["spread_mode"] == "strict",
                                     wall_limit=max(10.0, limit))
     stats.update(polish_stats)

@@ -11,7 +11,10 @@ from dataclasses import dataclass, field
 
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
+from api.scheduling.messages import Msg
+
 HORIZON = 6 * 3600
+DIRECTION_WORDS = (Msg("morning"), Msg("afternoon"))   # so the translation tools see them
 DROP_PENALTY = 10 ** 12
 
 
@@ -73,18 +76,21 @@ def precheck(p: VRPInput, names=None):
     total = sum(s.count for s in p.stops)
     seats = sum(b.capacity for b in p.buses)
     if not p.buses:
-        return ["No active buses. Add at least one bus."]
+        return [Msg("No active buses. Add at least one bus.")]
     if total > seats:
-        reasons.append(f"Not enough seats: {total} children ride in the {p.direction}, but the "
-                       f"{len(p.buses)} bus(es) have {seats} seats.")
+        reasons.append(Msg("Not enough seats: %(children)s children ride in the %(direction)s, but the %(buses)s "
+                           "bus(es) have %(seats)s seats.", children=total, direction=Msg(p.direction),
+                           buses=len(p.buses), seats=seats))
     biggest = max(b.capacity for b in p.buses)
     for i, s in enumerate(p.stops, start=1):
         if s.count > biggest:
-            reasons.append(f"The stop '{s.label}' has {s.count} children but the largest bus has {biggest} seats.")
+            reasons.append(Msg("The stop '%(stop)s' has %(n)s children but the largest bus has %(seats)s seats.",
+                               stop=s.label, n=s.count, seats=biggest))
         direct = p.durations[i][0] if p.direction == "morning" else p.durations[0][i]
         if direct > p.max_ride_seconds:
-            reasons.append(f"'{s.label}' is {direct / 60:.0f} minutes from school by road, longer than the "
-                           f"{p.max_ride_seconds / 60:.0f}-minute maximum ride.")
+            reasons.append(Msg("'%(stop)s' is %(minutes)s minutes from school by road, longer than the "
+                               "%(max)s-minute maximum ride.", stop=s.label, minutes=round(direct / 60),
+                               max=round(p.max_ride_seconds / 60)))
     return reasons
 
 
@@ -157,7 +163,7 @@ def solve(p: VRPInput, probe=False) -> VRPResult:
     sol = routing.SolveWithParameters(params)
     if sol is None:
         return VRPResult("infeasible", reasons=[
-            "No set of routes fits the seats and the maximum ride time. Add buses or allow longer rides."])
+            Msg("No set of routes fits the seats and the maximum ride time. Add buses or allow longer rides.")])
 
     routes, served = [], set()
     for v, bus in enumerate(p.buses):
@@ -194,15 +200,15 @@ def solve(p: VRPInput, probe=False) -> VRPResult:
     res = VRPResult("ok" if not dropped else "partial", routes=routes, dropped=dropped, used_buses=len(routes),
                     stats={"objective": sol.ObjectiveValue(), "buses_available": V})
     if dropped:
-        res.reasons.append("These stops could not be served within the seats and the maximum ride time: "
-                           + ", ".join(p.stops[i - 1].label for i in dropped[:15])
-                           + (" ..." if len(dropped) > 15 else "") + ". Add a bus or allow a longer ride.")
+        res.reasons.append(Msg("These stops could not be served within the seats and the maximum ride time: "
+                               "%(stops)s. Add a bus or allow a longer ride.",
+                               stops=", ".join(p.stops[i - 1].label for i in dropped[:15]) + (" ..." if len(dropped) > 15 else "")))
     if not dropped and V > 1 and not probe:
         k = min_buses(p)
         if k and k < V:
             res.stats["min_buses"] = k
-            res.stats["fewer_buses_note"] = (f"Only {k} of {V} buses are needed to serve every child within the "
-                                             f"limits (rides get longer with fewer buses).")
+            res.stats["fewer_buses_note"] = Msg("Only %(k)s of %(v)s buses are needed to serve every child within the "
+                                                "limits (rides get longer with fewer buses).", k=k, v=V)
     return res
 
 

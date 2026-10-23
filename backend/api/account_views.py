@@ -1,5 +1,6 @@
 import os
 
+from django.utils.translation import gettext as _
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
@@ -55,9 +56,9 @@ class PushSubscribeView(APIView):
             endpoint, keys = sub["endpoint"], sub["keys"]
             p256dh, auth = keys["p256dh"], keys["auth"]
         except (KeyError, TypeError):
-            return Response({"error": "Invalid subscription."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": _("Invalid subscription.")}, status=status.HTTP_400_BAD_REQUEST)
         if not str(endpoint).startswith("https://"):
-            return Response({"error": "Invalid endpoint."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": _("Invalid endpoint.")}, status=status.HTTP_400_BAD_REQUEST)
         PushSubscription.objects.update_or_create(endpoint=endpoint, defaults={
             "user": request.user, "p256dh": p256dh, "auth": auth})
         return Response({"ok": True}, status=status.HTTP_201_CREATED)

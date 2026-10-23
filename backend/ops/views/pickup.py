@@ -1,3 +1,4 @@
+from django.utils.translation import gettext as _
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
@@ -7,6 +8,7 @@ from rest_framework.views import APIView
 
 from api.access import SchoolAccess
 from api.notify import notify
+from api.scheduling.messages import Msg
 
 from ..common import MANAGERS, guardian_users, my_children, parse_date
 from ..models import PickupNotice, Student
@@ -34,12 +36,12 @@ class MyPickupView(APIView):
         access = SchoolAccess(request, school_id, read_roles=("parent",), write_roles=("parent",), module="pickup")
         student = my_children(request.user, access.school).filter(id=request.data.get("student")).first()
         if not student:
-            raise ValidationError({"student": "Unknown student."})
+            raise ValidationError({"student": _("Unknown student.")})
         s = PickupNoticeSerializer(data={**request.data, "student": student.id})
         s.is_valid(raise_exception=True)
         if s.validated_data["mode"] == "other" and not s.validated_data.get("person_name"):
-            raise ValidationError({"person_name": "Who is picking up?"})
-        notice, _ = PickupNotice.objects.update_or_create(
+            raise ValidationError({"person_name": _("Who is picking up?")})
+        notice, _created = PickupNotice.objects.update_or_create(
             student=student, date=s.validated_data["date"],
             defaults={"school": access.school, "mode": s.validated_data["mode"],
                       "person_name": s.validated_data.get("person_name", ""), "note": s.validated_data.get("note", ""),
@@ -74,7 +76,7 @@ class DismissalView(APIView):
         access = SchoolAccess(request, school_id, read_roles=STAFF, write_roles=STAFF, module="pickup")
         student = get_object_or_404(Student, id=request.data.get("student"), school=access.school)
         day = parse_date(request.data.get("date"), timezone.localdate())
-        notice, _ = PickupNotice.objects.get_or_create(
+        notice, _created = PickupNotice.objects.get_or_create(
             student=student, date=day,
             defaults={"school": access.school, "mode": "bus" if student.uses_bus_afternoon else "parent"})
         if request.data.get("undo"):
@@ -87,7 +89,8 @@ class DismissalView(APIView):
             notice.handed_over_to = str(request.data.get("handed_to") or notice.person_name or notice.get_mode_display())[:150]
         notice.save()
         if notice.handed_over_at:
-            notify(access.school, guardian_users([student]), "pickup", f"{student.first_name} has left school",
-                   f"Handed over to {notice.handed_over_to} at {timezone.localtime(notice.handed_over_at):%H:%M}.",
+            notify(access.school, guardian_users([student]), "pickup", Msg("%(name)s has left school", name=student.first_name),
+                   Msg("Handed over to %(who)s at %(time)s.", who=notice.handed_over_to,
+                       time=timezone.localtime(notice.handed_over_at).time()),
                    link="/children", channels=("push",))
         return Response(PickupNoticeSerializer(notice).data)

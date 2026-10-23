@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from api.access import log
+from api.i18n import payload, tr
 from api.scheduling.exams import ExamIn, ExamProblem, solve_exams
 
 from ..common import SchoolModelViewSet, active_timetable
@@ -56,10 +57,10 @@ class ExamPeriodViewSet(SchoolModelViewSet):
                     e.save(update_fields=["date", "session_index"])
                 ExamSitting.objects.bulk_create([ExamSitting(exam_id=eid, group_id=g, room_id=r, invigilator_id=t)
                                                  for eid, g, r, t in result.sittings])
-        ep.last_result = {"status": result.status, "reasons": result.reasons, "stats": result.stats}
+        ep.last_result = {"status": result.status, "reasons": payload(result.reasons), "stats": result.stats}
         ep.save(update_fields=["last_result"])
         log(school, request.user, "generate", ep, summary=f"Exam schedule '{ep.name}': {result.status}")
-        return Response({"result": ep.last_result,
+        return Response({"result": {**ep.last_result, "reasons": tr(ep.last_result["reasons"])},
                          "exams": ExamSerializer(ep.exams.all(), many=True, context={"school": school}).data})
 
 

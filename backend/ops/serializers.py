@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.utils.translation import gettext as _
 from django.db import transaction
 from rest_framework import serializers
 
@@ -58,7 +59,7 @@ class StudentSerializer(serializers.ModelSerializer):
                   "uses_bus_morning", "uses_bus_afternoon", "guardians", "guardians_input"]
 
     def get_guardians(self, obj):
-        links = StudentGuardian.objects.filter(student=obj).select_related("guardian")
+        links = obj.studentguardian_set.all()   # prefetched by the views (no query per student)
         return [{"id": l.guardian.id, "name": l.guardian.name, "phone": l.guardian.phone, "email": l.guardian.email,
                  "relation": l.guardian.relation, "is_primary": l.is_primary, "can_pickup": l.can_pickup,
                  "joined": l.guardian.user_id is not None} for l in links]
@@ -80,11 +81,11 @@ class StudentSerializer(serializers.ModelSerializer):
         if self.instance is None and data.get("is_active", True):
             if Student.objects.filter(school=school, is_active=True).count() >= school.max_students:
                 raise serializers.ValidationError(
-                    f"Your plan allows {school.max_students} students. Upgrade the plan to add more.")
+                    _("Your plan allows %(n)s students. Upgrade the plan to add more.") % {"n": school.max_students})
         for f in ("home_lat", "home_lng"):
             v = data.get(f)
             if v is not None and not (-90 <= v <= 90 if f == "home_lat" else -180 <= v <= 180):
-                raise serializers.ValidationError({f: "Invalid coordinate."})
+                raise serializers.ValidationError({f: _("Invalid coordinate.")})
         return data
 
     def _save_guardians(self, student, items):
@@ -96,14 +97,14 @@ class StudentSerializer(serializers.ModelSerializer):
             if item.get("id"):
                 g = Guardian.objects.filter(id=item["id"], school=school).first()
                 if not g:
-                    raise serializers.ValidationError({"guardians_input": "Unknown parent."})
+                    raise serializers.ValidationError({"guardians_input": _("Unknown parent.")})
                 for f in ("name", "phone", "email", "relation"):
                     if item.get(f):
                         setattr(g, f, item[f])
                 g.save()
             else:
                 if not item.get("name"):
-                    raise serializers.ValidationError({"guardians_input": "Parent name is required."})
+                    raise serializers.ValidationError({"guardians_input": _("Parent name is required.")})
                 g = Guardian.objects.create(school=school, name=item["name"], phone=item.get("phone", ""),
                                             email=item.get("email", ""), relation=item.get("relation", ""))
             StudentGuardian.objects.update_or_create(student=student, guardian=g, defaults={
@@ -149,14 +150,14 @@ class AnnouncementSerializer(serializers.ModelSerializer):
     def validate(self, data):
         aud = data.get("audience", "school")
         if aud == "grade" and not data.get("grade_level"):
-            raise serializers.ValidationError({"grade_level": "Choose a grade."})
+            raise serializers.ValidationError({"grade_level": _("Choose a grade.")})
         if aud == "group" and not data.get("group"):
-            raise serializers.ValidationError({"group": "Choose a class group."})
+            raise serializers.ValidationError({"group": _("Choose a class group.")})
         if aud == "guardian" and not data.get("guardian"):
-            raise serializers.ValidationError({"guardian": "Choose a parent."})
+            raise serializers.ValidationError({"guardian": _("Choose a parent.")})
         access = self.context["access"]
         if not access.is_manager and aud != "group":
-            raise serializers.ValidationError("Teachers can only send announcements to their class groups.")
+            raise serializers.ValidationError(_("Teachers can only send announcements to their class groups."))
         return data
 
 
@@ -167,7 +168,7 @@ class CalendarEventSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if data.get("end_date") and data.get("start_date") and data["end_date"] < data["start_date"]:
-            raise serializers.ValidationError("The end date is before the start date.")
+            raise serializers.ValidationError(_("The end date is before the start date."))
         return data
 
 
@@ -219,7 +220,7 @@ class AbsenceReportSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if data["date_to"] < data["date_from"]:
-            raise serializers.ValidationError("The end date is before the start date.")
+            raise serializers.ValidationError(_("The end date is before the start date."))
         return data
 
 
@@ -260,7 +261,7 @@ class HomeworkSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if data.get("due_date") and data.get("assigned_date") and data["due_date"] < data["assigned_date"]:
-            raise serializers.ValidationError("The due date is before the assigned date.")
+            raise serializers.ValidationError(_("The due date is before the assigned date."))
         return data
 
 
@@ -294,10 +295,17 @@ class ExamPeriodSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "start_date", "end_date", "sessions", "max_exams_per_day", "last_result"]
         read_only_fields = ["last_result"]
 
+    def to_representation(self, instance):
+        from api.i18n import tr
+        data = super().to_representation(instance)
+        if data.get("last_result", {}).get("reasons"):
+            data["last_result"] = {**data["last_result"], "reasons": tr(data["last_result"]["reasons"])}
+        return data
+
     def validate_sessions(self, value):
         if not isinstance(value, list) or not value or any(
                 not isinstance(s, dict) or not s.get("start") or not s.get("end") for s in value):
-            raise serializers.ValidationError('Add at least one session like {"start": "09:00", "end": "11:00"}.')
+            raise serializers.ValidationError(_('Add at least one session like {"start": "09:00", "end": "11:00"}.'))
         return value
 
 
@@ -326,7 +334,7 @@ class ExamSerializer(serializers.ModelSerializer):
 
     def validate_exam_period(self, value):
         if value.school_id != self.context["school"].id:
-            raise serializers.ValidationError("Unknown exam period.")
+            raise serializers.ValidationError(_("Unknown exam period."))
         return value
 
 
@@ -343,24 +351,25 @@ class FeePlanSerializer(serializers.ModelSerializer):
 
     def validate_items(self, items):
         if not isinstance(items, list) or not items:
-            raise serializers.ValidationError("Add at least one fee item.")
+            raise serializers.ValidationError(_("Add at least one fee item."))
         for it in items:
             try:
                 amount = Decimal(str(it["amount"]))
             except Exception:  # noqa: BLE001
-                raise serializers.ValidationError("Each item needs an amount.")
+                raise serializers.ValidationError(_("Each item needs an amount."))
             if amount < 0:
-                raise serializers.ValidationError("Amounts cannot be negative.")
+                raise serializers.ValidationError(_("Amounts cannot be negative."))
             insts = it.get("installments") or []
             if insts:
                 total = sum(Decimal(str(x["amount"])) for x in insts)
                 if total != amount:
                     raise serializers.ValidationError(
-                        f"Installments of '{it.get('description', '')}' add up to {total}, not {amount}.")
+                        _("Installments of '%(item)s' add up to %(total)s, not %(amount)s.")
+                        % {"item": it.get("description", ""), "total": total, "amount": amount})
                 for x in insts:
                     serializers.DateField().to_internal_value(x["due_date"])
             elif not it.get("due_date"):
-                raise serializers.ValidationError("Each item needs a due date or installments.")
+                raise serializers.ValidationError(_("Each item needs a due date or installments."))
         return items
 
 
@@ -389,7 +398,7 @@ class StudentFeeSerializer(serializers.ModelSerializer):
         amount = data.get("amount", getattr(self.instance, "amount", None))
         discount = data.get("discount", getattr(self.instance, "discount", Decimal("0")))
         if insts is not None and amount is not None and sum(i["amount"] for i in insts) != amount - discount:
-            raise serializers.ValidationError("Installments must add up to the amount minus discount.")
+            raise serializers.ValidationError(_("Installments must add up to the amount minus discount."))
         return data
 
     @transaction.atomic
@@ -429,7 +438,7 @@ class PaymentSerializer(serializers.ModelSerializer):
 
     def validate_amount(self, value):
         if value <= 0:
-            raise serializers.ValidationError("The amount must be more than zero.")
+            raise serializers.ValidationError(_("The amount must be more than zero."))
         return value
 
 

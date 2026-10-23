@@ -5,6 +5,7 @@ Jobs run in a background thread of the web process (no Celery needed at this sca
 single source of truth for progress; the frontend polls it. Set TIMETABLE_JOBS_SYNC=1 to run inline (tests).
 """
 import logging
+import json
 import os
 import threading
 import time
@@ -14,6 +15,9 @@ from django.conf import settings
 from django.db import close_old_connections, transaction
 from django.utils import timezone
 
+from .i18n import payload, tr
+from .scheduling.messages import Msg
+
 from .models import (
     Classroom, SchedulePeriod, SolverSettings, StudentGroup, Subject, SubjectRequirement, Teacher,
     TeacherAvailablePeriod, TimetableEntry, TimetableJob,
@@ -21,6 +25,20 @@ from .models import (
 
 log = logging.getLogger(__name__)
 LESSON_TYPES = ("lecture", "lab")
+
+
+def store(message):
+    """Job messages are kept as JSON so they can be shown in the reader's language."""
+    return json.dumps(payload(message)) if isinstance(message, Msg) else str(message)[:500]
+
+
+def read_message(text):
+    if text and text.startswith('{"t"'):
+        try:
+            return tr(json.loads(text))
+        except ValueError:
+            return text
+    return tr(text) if text else text
 
 
 def solver_settings_for(school):
@@ -107,7 +125,7 @@ def run_job(job_id, threaded=False):
         close_old_connections()
     job = TimetableJob.objects.select_related("timetable__school", "timetable__schedule").get(id=job_id)
     TimetableJob.objects.filter(id=job_id).update(status="running", started_at=timezone.now(), progress=1,
-                                                  message="Preparing data")
+                                                  message=store(Msg("Preparing data")))
     last = [0.0]
 
     def progress(frac, message):
@@ -115,37 +133,37 @@ def run_job(job_id, threaded=False):
         if now - last[0] < 1.0 and frac < 0.99:
             return
         last[0] = now
-        TimetableJob.objects.filter(id=job_id).update(progress=min(99, int(frac * 100)), message=message[:200])
+        TimetableJob.objects.filter(id=job_id).update(progress=min(99, int(frac * 100)), message=store(message))
 
     try:
         params = job.params or {}
         problem, kept = build_problem(job.timetable, params.get("group_ids"), params.get("teacher_ids"),
                                       params.get("time_limit"))
         result = solve(problem, on_progress=progress)
-        payload = {
+        result_payload = {
             "status": result.status, "score": result.score, "violations": result.violations,
-            "reasons": result.reasons, "stats": result.stats, "lessons": len(result.lessons), "kept": len(kept),
+            "reasons": payload(result.reasons), "stats": result.stats, "lessons": len(result.lessons), "kept": len(kept),
         }
         if result.ok:
             save_lessons(job.timetable, kept, result.lessons)
-            status, message = "succeeded", f"Placed {len(result.lessons)} lessons (kept {len(kept)})."
+            status, message = "succeeded", Msg("Placed %(n)s lessons (kept %(k)s).", n=len(result.lessons), k=len(kept))
         elif result.status == "infeasible":
-            status, message = "infeasible", "No valid timetable exists with the current data."
+            status, message = "infeasible", Msg("No valid timetable exists with the current data.")
         else:
-            status, message = "failed", (result.reasons or ["Solver stopped without a timetable."])[0]
-        TimetableJob.objects.filter(id=job_id).update(status=status, progress=100, message=message,
-                                                      result=payload, finished_at=timezone.now())
+            status, message = "failed", (result.reasons or [Msg("Solver stopped without a timetable.")])[0]
+        TimetableJob.objects.filter(id=job_id).update(status=status, progress=100, message=store(message),
+                                                      result=result_payload, finished_at=timezone.now())
     except Exception as exc:  # noqa: BLE001 - surface any crash on the job row
         log.exception("Timetable job %s crashed", job_id)
         TimetableJob.objects.filter(id=job_id).update(status="failed", progress=100, finished_at=timezone.now(),
-                                                      message=f"Generator error: {exc}"[:500])
+                                                      message=store(Msg("Generator error: %(error)s", error=str(exc)[:300])))
     finally:
         if threaded:
             close_old_connections()
 
 
 def start_job(timetable, user, params):
-    job = TimetableJob.objects.create(timetable=timetable, created_by=user, params=params, message="Queued")
+    job = TimetableJob.objects.create(timetable=timetable, created_by=user, params=params, message=store(Msg("Queued")))
     if getattr(settings, "TIMETABLE_JOBS_SYNC", False):
         run_job(job.id)
     else:
@@ -161,7 +179,7 @@ def expire_stale(job):
         started = job.started_at or job.created_at
         if timezone.now() - started > timedelta(seconds=float(limit) * 3 + 300):
             job.status, job.progress = "failed", 100
-            job.message = "The generator was interrupted (server restart). Please run it again."
+            job.message = store(Msg("The generator was interrupted (server restart). Please run it again."))
             job.finished_at = timezone.now()
             job.save(update_fields=["status", "progress", "message", "finished_at"])
     return job

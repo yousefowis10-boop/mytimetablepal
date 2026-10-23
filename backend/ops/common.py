@@ -1,6 +1,7 @@
 """Helpers shared by the operations modules."""
 from datetime import date, timedelta
 
+from django.utils.translation import gettext as _
 from django.contrib.auth.models import User
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -68,7 +69,7 @@ def parse_date(value, default=None):
         return date.fromisoformat(str(value)[:10])
     except ValueError:
         from rest_framework.exceptions import ValidationError
-        raise ValidationError({"date": "Use the format YYYY-MM-DD."})
+        raise ValidationError({"date": _("Use the format YYYY-MM-DD.")})
 
 
 def is_staff_member(access):

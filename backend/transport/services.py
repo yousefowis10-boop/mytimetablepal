@@ -7,6 +7,8 @@ from django.db import transaction
 from django.utils import timezone
 
 from api.access import log
+from api.i18n import payload
+from api.scheduling.messages import Msg
 from api.notify import notify
 
 from .models import (
@@ -124,10 +126,10 @@ def plan_routes(school, direction, user=None, day=None):
     from ops.models import Student
     cfg = settings_for(school)
     if school.latitude is None or school.longitude is None:
-        raise PlanError("Set the school's location on the map first (Settings).")
+        raise PlanError(Msg("Set the school's location on the map first (Settings)."))
     buses = list(Bus.objects.filter(school=school, is_active=True))
     if not buses:
-        raise PlanError("Add at least one bus first.")
+        raise PlanError(Msg("Add at least one bus first."))
     flag = "uses_bus_morning" if direction == "morning" else "uses_bus_afternoon"
     students = list(Student.objects.filter(school=school, is_active=True, **{flag: True}))
     plan_day = day or timezone.localdate()
@@ -160,11 +162,11 @@ def _plan_one(school, cfg, buses, students, direction, anchor, user, day):
     result = solve(vrp)
     bus_by_id = {b.id: b for b in buses}
     summary = {
-        "status": result.status, "reasons": result.reasons, "students": len(students),
+        "status": result.status, "reasons": payload(result.reasons), "students": len(students),
         "stops": len(stops), "buses_available": len(buses), "buses_used": result.used_buses,
-        "provider": provider_used, "provider_note": note, "anchor": anchor.strftime("%H:%M"),
+        "provider": provider_used, "provider_note": payload(note), "anchor": anchor.strftime("%H:%M"),
         "missing_home_location": [s.full_name for s in missing],
-        "fewer_buses_note": result.stats.get("fewer_buses_note", ""),
+        "fewer_buses_note": payload(result.stats.get("fewer_buses_note", "")),
     }
     with transaction.atomic():
         plan = RoutePlan.objects.create(school=school, direction=direction, date=day, created_by=user,
@@ -289,8 +291,8 @@ def start_run(run, user):
     run.status, run.started_at, run.driver = "active", timezone.now(), user
     run.save(update_fields=["status", "started_at", "driver"])
     kids = [s for st in run.route.stops.prefetch_related("students") for s in st.students.all()]
-    title = "The bus left school" if run.route.plan.direction == "afternoon" else "The bus is on its way"
-    notify(run.school, _guardians_of(kids), "bus", title, f"{run.route.bus.name} started its route.",
+    title = Msg("The bus left school") if run.route.plan.direction == "afternoon" else Msg("The bus is on its way")
+    notify(run.school, _guardians_of(kids), "bus", title, Msg("%(bus)s started its route.", bus=run.route.bus.name),
            link="/bus", channels=("push",))
 
 
@@ -321,14 +323,14 @@ def record_location(run, lat, lng, accuracy=None):
         minutes = (etas[s.id] - now).total_seconds() / 60
         key = f"near:{s.id}"
         if minutes <= cfg.eta_notify_minutes and key not in notified:
-            notify(run.school, _guardians_of(list(s.students.all())), "bus", "The bus is about 5 minutes away",
-                   f"{run.route.bus.name} will reach your stop in about {max(1, round(minutes))} minute(s).",
-                   link="/bus", channels=("push",))
+            notify(run.school, _guardians_of(list(s.students.all())), "bus", Msg("The bus is almost at your stop"),
+                   Msg("%(bus)s will reach your stop in about %(n)s minute(s).", bus=run.route.bus.name,
+                       n=max(1, round(minutes))), link="/bus", channels=("push",))
             notified[key] = now.isoformat()
     if run.delay_minutes >= cfg.late_notify_minutes and "late" not in notified:
         kids = [k for s in remaining if not s.is_school for k in s.students.all()]
-        notify(run.school, _guardians_of(kids), "bus", "The bus is running late",
-               f"{run.route.bus.name} is running about {round(run.delay_minutes)} minutes late.",
+        notify(run.school, _guardians_of(kids), "bus", Msg("The bus is running late"),
+               Msg("%(bus)s is running about %(n)s minutes late.", bus=run.route.bus.name, n=round(run.delay_minutes)),
                link="/bus", channels=("push",))
         notified["late"] = now.isoformat()
     run.notified = notified
@@ -342,10 +344,14 @@ def record_event(run, kind, student=None, stop=None):
         run.next_stop_order = stop.order + 1
         run.save(update_fields=["next_stop_order"])
     if student is not None and kind in ("picked_up", "dropped_off"):
-        text = "was picked up by the bus" if kind == "picked_up" else "was dropped off"
-        notify(run.school, _guardians_of([student]), "bus", f"{student.first_name} {text}",
-               f"{student.full_name} {text} at {timezone.localtime():%H:%M} ({run.route.bus.name}).",
-               link="/bus", channels=("push",))
+        now = timezone.localtime().time()
+        if kind == "picked_up":
+            title = Msg("%(name)s was picked up by the bus", name=student.first_name)
+            body = Msg("%(name)s was picked up at %(time)s (%(bus)s).", name=student.full_name, time=now, bus=run.route.bus.name)
+        else:
+            title = Msg("%(name)s was dropped off", name=student.first_name)
+            body = Msg("%(name)s was dropped off at %(time)s (%(bus)s).", name=student.full_name, time=now, bus=run.route.bus.name)
+        notify(run.school, _guardians_of([student]), "bus", title, body, link="/bus", channels=("push",))
 
 
 def finish_run(run):

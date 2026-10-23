@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "axios": "^1.12.2",
@@ -45,7 +46,9 @@
     "tailwindcss": "^3.4.17",
     "vite": "npm:rolldown-vite@7.1.12",
     "vite-plugin-pwa": "^2.0.0",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "workbox-precaching": "^7.4.1",
+    "workbox-routing": "^7.4.1"
   },
   "overrides": {
     "vite": "npm:rolldown-vite@7.1.12"

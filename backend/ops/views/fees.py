@@ -2,6 +2,7 @@ from collections import defaultdict
 from datetime import timedelta
 from decimal import Decimal
 
+from django.utils.translation import gettext as _
 from django.db import transaction
 from django.db.models import Max, Sum
 from django.shortcuts import get_object_or_404
@@ -14,6 +15,7 @@ from rest_framework.views import APIView
 
 from api.access import SchoolAccess, log
 from api.notify import notify
+from api.scheduling.messages import Msg
 
 from ..common import ALL_ROLES, MANAGERS, SchoolModelViewSet, guardian_users, my_children
 from ..models import FeePlan, Installment, Payment, Student, StudentFee, StudentGuardian
@@ -78,7 +80,7 @@ class FeePlanViewSet(SchoolModelViewSet):
         elif d.get("grade_level"):
             students = students.filter(group__grade_level=d["grade_level"])
         else:
-            raise ValidationError("Choose students, groups or a grade.")
+            raise ValidationError(_("Choose students, groups or a grade."))
         created = skipped = 0
         with transaction.atomic():
             for s in students:
@@ -162,9 +164,10 @@ class PaymentViewSet(SchoolModelViewSet):
                                       receipt_number=next_receipt_number(school))
             reallocate(payment.student)
         self.audit("create", payment)
-        notify(school, guardian_users([payment.student]), "fee_payment", "Payment received",
-               f"{payment.amount} {school.currency} for {payment.student.full_name}. "
-               f"Receipt {payment.receipt_number}.", link="/fees", channels=("push", "email"))
+        notify(school, guardian_users([payment.student]), "fee_payment", Msg("Payment received"),
+               Msg("%(amount)s %(currency)s for %(name)s. Receipt %(receipt)s.", amount=money(payment.amount),
+                   currency=school.currency, name=payment.student.full_name, receipt=payment.receipt_number),
+               link="/fees", channels=("push", "email"))
 
     def perform_destroy(self, instance):
         student = instance.student
@@ -258,14 +261,16 @@ def send_fee_reminders():
             continue
         s = inst.fee.student
         if not inst.reminder_before_sent and today <= inst.due_date <= today + timedelta(days=school.fee_reminder_days_before):
-            notify(school, guardian_users([s]), "fee_reminder", "Fee due soon",
-                   f"{inst.outstanding} {school.currency} for {s.full_name} ({inst.fee.description}) is due on "
-                   f"{inst.due_date:%d %B}.", link="/fees")
+            notify(school, guardian_users([s]), "fee_reminder", Msg("Fee due soon"),
+                   Msg("%(amount)s %(currency)s for %(name)s (%(item)s) is due on %(day)s.", amount=money(inst.outstanding),
+                       currency=school.currency, name=s.full_name, item=inst.fee.description, day=inst.due_date),
+                   link="/fees")
             Installment.objects.filter(id=inst.id).update(reminder_before_sent=True)
         elif not inst.reminder_after_sent and inst.due_date + timedelta(days=school.fee_reminder_days_after) <= today:
-            notify(school, guardian_users([s]), "fee_overdue", "Fee overdue",
-                   f"{inst.outstanding} {school.currency} for {s.full_name} ({inst.fee.description}) was due on "
-                   f"{inst.due_date:%d %B}.", link="/fees")
+            notify(school, guardian_users([s]), "fee_overdue", Msg("Fee overdue"),
+                   Msg("%(amount)s %(currency)s for %(name)s (%(item)s) was due on %(day)s.", amount=money(inst.outstanding),
+                       currency=school.currency, name=s.full_name, item=inst.fee.description, day=inst.due_date),
+                   link="/fees")
             Installment.objects.filter(id=inst.id).update(reminder_after_sent=True)
 
 

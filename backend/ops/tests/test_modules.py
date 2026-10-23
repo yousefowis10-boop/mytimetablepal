@@ -45,7 +45,7 @@ class AttendanceAndCoverTests(TestCase):
                         {"student": self.a["other_child"].id, "status": "present"}]}, format="json")
         self.assertEqual(res.json()["parents_notified"], 1)
         n = Notification.objects.get(user=self.a["parent"], kind="attendance")
-        self.assertIn("absent", n.title)
+        self.assertIn("غائب", n.title)            # parent has no language set: school default (Arabic)
         self.assertFalse(Notification.objects.filter(user=self.a["other_parent"]).exists())
         # Saving again does not notify twice
         t.post(f"{self.base}/attendance/sheet/", {"group": self.a["group"].id, "date": str(TODAY),

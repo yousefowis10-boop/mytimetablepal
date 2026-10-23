@@ -1,3 +1,4 @@
+from django.utils.translation import gettext as _
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -6,6 +7,7 @@ from rest_framework.response import Response
 
 from api.models import StudentGroup
 from api.notify import notify
+from api.scheduling.messages import Msg
 
 from ..common import SchoolModelViewSet, staff_users
 from ..models import Applicant, Guardian, Student, StudentGuardian
@@ -41,12 +43,12 @@ class ApplicantViewSet(SchoolModelViewSet):
         """POST {"group": id} - create the student and parent records from an accepted applicant."""
         a = self.get_object()
         if a.student_id:
-            return Response({"error": "Already enrolled."}, status=400)
+            return Response({"error": _("Already enrolled.")}, status=400)
         group = get_object_or_404(StudentGroup, id=request.data.get("group"), school=a.school) \
             if request.data.get("group") else None
         if Student.objects.filter(school=a.school, is_active=True).count() >= a.school.max_students:
-            return Response({"error": f"Your plan allows {a.school.max_students} students."}, status=400)
-        first, _, last = a.child_name.partition(" ")
+            return Response({"error": _("Your plan allows %(n)s students. Upgrade the plan to add more.") % {"n": a.school.max_students}}, status=400)
+        first, _sep, last = a.child_name.partition(" ")
         with transaction.atomic():
             student = Student.objects.create(school=a.school, first_name=first, last_name=last, group=group,
                                              date_of_birth=a.date_of_birth)
@@ -71,6 +73,6 @@ def admissions_follow_ups():
         if school.is_suspended or not school.has_module("admissions"):
             continue
         names = ", ".join(a.child_name for a in leads[:5]) + (" ..." if len(leads) > 5 else "")
-        notify(school, staff_users(school), "admissions", f"{len(leads)} admission follow-up(s) due",
+        notify(school, staff_users(school), "admissions", Msg("%(n)s admission follow-up(s) due", n=len(leads)),
                names, link="/admissions")
         Applicant.objects.filter(id__in=[a.id for a in leads]).update(follow_up_notified=today)

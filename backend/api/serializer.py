@@ -1,3 +1,4 @@
+from django.utils.translation import gettext as _
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
@@ -35,7 +36,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value):
         if User.objects.filter(username__iexact=value).exists():
-            raise serializers.ValidationError("An account with this email already exists.")
+            raise serializers.ValidationError(_("An account with this email already exists."))
         return value
 
     def validate_password(self, value):
@@ -83,7 +84,7 @@ class SubjectRequirementSerializer(serializers.ModelSerializer):
         lessons = data.get("lectures_per_week", getattr(self.instance, "lectures_per_week", 1))
         doubles = data.get("double_periods_per_week", getattr(self.instance, "double_periods_per_week", 0))
         if doubles * 2 > lessons:
-            raise serializers.ValidationError("Double periods use two lessons each; too many for the weekly lessons.")
+            raise serializers.ValidationError(_("Double periods use two lessons each; too many for the weekly lessons."))
         return data
 
 
@@ -143,35 +144,35 @@ class SchoolSerializer(serializers.ModelSerializer):
         if not value:
             return ""
         if not value.startswith(LOGO_PREFIXES):
-            raise serializers.ValidationError("Upload a PNG, JPEG or WebP image.")
+            raise serializers.ValidationError(_("Upload a PNG, JPEG or WebP image."))
         if len(value) > 450_000:
-            raise serializers.ValidationError("Logo is too large; please use an image under 300 KB.")
+            raise serializers.ValidationError(_("Logo is too large; please use an image under 300 KB."))
         return value
 
     def validate_brand_color(self, value):
         import re
         if value and not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
-            raise serializers.ValidationError("Use a colour like #2563eb.")
+            raise serializers.ValidationError(_("Use a colour like #2563eb."))
         return value
 
     def validate_currency(self, value):
         if not value.isalpha() or len(value) != 3:
-            raise serializers.ValidationError("Use a 3-letter currency code such as JOD.")
+            raise serializers.ValidationError(_("Use a 3-letter currency code such as JOD."))
         return value.upper()
 
     def validate_grading_scale(self, value):
         if not isinstance(value, list) or any(
                 not isinstance(b, dict) or "min" not in b or "label" not in b for b in value):
-            raise serializers.ValidationError('Use a list like [{"min": 90, "label": "A"}].')
+            raise serializers.ValidationError(_('Use a list like [{"min": 90, "label": "A"}].'))
         return sorted(value, key=lambda b: -float(b["min"]))
 
     def validate_week_days(self, value):
         try:
             days = [int(d) for d in value.split(",") if d.strip()]
         except ValueError:
-            raise serializers.ValidationError("Use day numbers 1-7 separated by commas (7=Sunday).")
+            raise serializers.ValidationError(_("Use day numbers 1-7 separated by commas (7=Sunday)."))
         if not days or len(set(days)) != len(days) or any(d < 1 or d > 7 for d in days):
-            raise serializers.ValidationError("Use day numbers 1-7 separated by commas (7=Sunday), no repeats.")
+            raise serializers.ValidationError(_("Use day numbers 1-7 separated by commas (7=Sunday), no repeats."))
         return ",".join(str(d) for d in days)
 
 
@@ -212,7 +213,7 @@ class SubjectSerializer(serializers.ModelSerializer):
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
         if school and qs.exists():
-            raise serializers.ValidationError("Another subject in this school already uses this code.")
+            raise serializers.ValidationError(_("Another subject in this school already uses this code."))
         return value
 
 
@@ -256,7 +257,7 @@ class TimetableEntrySerializer(serializers.ModelSerializer):
             ivalue = None
         if ivalue in DAY_NAMES:
             return ivalue
-        raise serializers.ValidationError(f"Invalid day_of_week: {value}")
+        raise serializers.ValidationError(_("Invalid day of the week: %(value)s") % {"value": value})
 
     def to_representation(self, instance):
         # The frontend compares day_of_week numerically (7=Sunday .. 4=Thursday).
@@ -271,7 +272,21 @@ class TimetableEntrySerializer(serializers.ModelSerializer):
 
 
 class TimetableJobSerializer(serializers.ModelSerializer):
+    message = serializers.SerializerMethodField()
+    result = serializers.SerializerMethodField()
+
     class Meta:
         model = TimetableJob
         fields = ["id", "timetable", "status", "progress", "message", "params", "result",
                   "created_at", "started_at", "finished_at"]
+
+    def get_message(self, obj):
+        from .timetable_jobs import read_message
+        return read_message(obj.message)
+
+    def get_result(self, obj):
+        from .i18n import tr
+        result = dict(obj.result or {})
+        if result.get("reasons"):
+            result["reasons"] = tr(result["reasons"])
+        return result

@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import date, timedelta
 
+from django.utils.translation import gettext as _
 from django.db import transaction
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
@@ -13,6 +14,7 @@ from rest_framework.views import APIView
 from api.access import SchoolAccess
 from api.models import SchedulePeriod, StudentGroup
 from api.notify import notify
+from api.scheduling.messages import Msg
 
 from ..common import ALL_ROLES, MANAGERS, SchoolModelViewSet, active_timetable, guardian_users, my_children, \
     parse_date, teacher_for
@@ -88,10 +90,10 @@ class AttendanceSheetView(APIView):
         period = None
         if school.attendance_mode == "period":
             if not data.get("period"):
-                raise ValidationError({"period": "Choose the lesson period."})
+                raise ValidationError({"period": _("Choose the lesson period.")})
             period = get_object_or_404(SchedulePeriod, id=data.get("period"), schedule__school=school)
         if not can_take(access, request.user, group, day, period):
-            raise PermissionDenied("You do not teach this group at this time.")
+            raise PermissionDenied(_("You do not teach this group at this time."))
         return access, group, day, period
 
     def get(self, request, school_id):
@@ -116,8 +118,8 @@ class AttendanceSheetView(APIView):
             for r in records:
                 sid, st = r.get("student"), r.get("status")
                 if sid not in students or st not in valid:
-                    raise ValidationError({"records": f"Invalid record {r}."})
-                rec, _ = AttendanceRecord.objects.update_or_create(
+                    raise ValidationError({"records": _("Invalid attendance record: %(record)s") % {"record": r}})
+                rec, _created = AttendanceRecord.objects.update_or_create(
                     student_id=sid, date=day, period=period,
                     defaults={"school": access.school, "status": st, "note": str(r.get("note", ""))[:200],
                               "taken_by": request.user})
@@ -125,10 +127,15 @@ class AttendanceSheetView(APIView):
                     to_notify.append(rec)
         for rec in to_notify:
             s = students[rec.student_id]
-            when = f"{period.name} " if period else ""
-            word = "absent" if rec.status == "absent" else "late"
-            notify(access.school, guardian_users([s]), "attendance", f"{s.first_name} was marked {word}",
-                   f"{s.full_name} was marked {word} {when}on {day:%A %d %B}.", link="/children",
+            if rec.status == "absent":
+                title = Msg("%(name)s was marked absent", name=s.first_name)
+                body = (Msg("%(name)s was marked absent in %(period)s on %(day)s.", name=s.full_name, period=period.name, day=day)
+                        if period else Msg("%(name)s was marked absent on %(day)s.", name=s.full_name, day=day))
+            else:
+                title = Msg("%(name)s was marked late", name=s.first_name)
+                body = (Msg("%(name)s was marked late in %(period)s on %(day)s.", name=s.full_name, period=period.name, day=day)
+                        if period else Msg("%(name)s was marked late on %(day)s.", name=s.full_name, day=day))
+            notify(access.school, guardian_users([s]), "attendance", title, body, link="/children",
                    data={"student": s.id, "date": str(day), "status": rec.status})
             AttendanceRecord.objects.filter(id=rec.id).update(parent_notified=True)
         return Response({"saved": len(records), "parents_notified": len(to_notify)})
@@ -153,12 +160,13 @@ class AbsenceReportViewSet(SchoolModelViewSet):
         student = serializer.validated_data["student"]
         if student.school_id != access.school.id or (
                 not access.is_manager and not my_children(self.request.user, access.school).filter(id=student.id).exists()):
-            raise ValidationError({"student": "Unknown student."})
+            raise ValidationError({"student": _("Unknown student.")})
         report = serializer.save(school=access.school, reported_by=self.request.user)
         from ..common import staff_users
         notify(access.school, staff_users(access.school), "absence_report",
-               f"Absence reported: {student.full_name}",
-               f"{report.date_from} to {report.date_to}: {report.reason}", link="/attendance")
+               Msg("Absence reported: %(name)s", name=student.full_name),
+               Msg("%(start)s to %(end)s: %(reason)s", start=report.date_from, end=report.date_to, reason=report.reason),
+               link="/attendance")
 
 
 def attendance_stats(school, students, start, end):
@@ -217,7 +225,7 @@ class AttendanceReportView(APIView):
             y, m = (int(x) for x in month.split("-"))
             start = date(y, m, 1)
         except ValueError:
-            raise ValidationError({"month": "Use YYYY-MM."})
+            raise ValidationError({"month": _("Use YYYY-MM.")})
         end = (start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
         stats = attendance_stats(school, students, start, end)
         threshold = school.absence_alert_threshold

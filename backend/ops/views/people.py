@@ -1,3 +1,4 @@
+from django.utils.translation import gettext as _
 from django.db.models import Q
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -15,7 +16,7 @@ class StudentViewSet(SchoolModelViewSet):
 
     def get_queryset(self):
         qs = (Student.objects.filter(school=self.get_school()).select_related("group")
-              .prefetch_related("guardians"))
+              .prefetch_related("studentguardian_set__guardian"))
         p = self.request.query_params
         if p.get("group"):
             qs = qs.filter(group_id=p["group"])
@@ -37,7 +38,7 @@ class StudentViewSet(SchoolModelViewSet):
         ids = request.data.get("student_ids") or []
         group_id = request.data.get("group")
         if group_id and not school.student_groups.filter(id=group_id).exists():
-            return Response({"error": "Unknown group."}, status=400)
+            return Response({"error": _("Unknown group.")}, status=400)
         n = Student.objects.filter(school=school, id__in=ids).update(group_id=group_id)
         return Response({"moved": n})
 

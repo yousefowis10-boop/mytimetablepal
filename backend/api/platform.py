@@ -4,6 +4,7 @@ Multi-school platform: school sign-up, invitations / joining, "me", setup checkl
 import secrets
 from datetime import timedelta
 
+from django.utils.translation import gettext as _
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
@@ -62,7 +63,7 @@ class SchoolSignupSerializer(serializers.Serializer):
 
     def validate_email(self, value):
         if User.objects.filter(username__iexact=value).exists():
-            raise serializers.ValidationError("This email already has an account. Log in and add a school from there.")
+            raise serializers.ValidationError(_("This email already has an account. Log in and add a school from there."))
         return value.lower()
 
     def validate_password(self, value):
@@ -112,7 +113,7 @@ class MeView(APIView):
 
     def get(self, request):
         u = request.user
-        profile, _ = UserProfile.objects.get_or_create(user=u)
+        profile, _created = UserProfile.objects.get_or_create(user=u)
         return Response({
             "id": u.id, "email": u.email or u.username, "first_name": u.first_name, "last_name": u.last_name,
             "is_platform_owner": u.is_superuser, "language": profile.language, "phone": profile.phone,
@@ -121,7 +122,7 @@ class MeView(APIView):
         })
 
     def patch(self, request):
-        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        profile, _created = UserProfile.objects.get_or_create(user=request.user)
         for field in ("language", "phone", "email_notifications", "push_notifications"):
             if field in request.data:
                 setattr(profile, field, request.data[field])
@@ -152,17 +153,17 @@ class InvitationSerializer(serializers.ModelSerializer):
         role = data.get("role")
         teacher = data.get("teacher")
         if teacher and teacher.school_id != school.id:
-            raise serializers.ValidationError("Unknown teacher.")
+            raise serializers.ValidationError(_("Unknown teacher."))
         if data.get("guardian_id"):
             from ops.models import Guardian
             if not Guardian.objects.filter(id=data["guardian_id"], school=school).exists():
-                raise serializers.ValidationError("Unknown parent.")
+                raise serializers.ValidationError(_("Unknown parent."))
         if data.get("bus_id"):
             from transport.models import Bus
             if not Bus.objects.filter(id=data["bus_id"], school=school).exists():
-                raise serializers.ValidationError("Unknown bus.")
+                raise serializers.ValidationError(_("Unknown bus."))
         if role == "admin" and not self.context["access"].has("admin"):
-            raise serializers.ValidationError("Only admins can invite admins.")
+            raise serializers.ValidationError(_("Only admins can invite admins."))
         return data
 
 
@@ -213,9 +214,9 @@ class InvitationPreviewView(APIView):
 def _valid_invitation(code):
     inv = get_object_or_404(Invitation.objects.select_related("school"), code=str(code).strip().upper())
     if inv.accepted_by_id or inv.expires_at < timezone.now():
-        raise serializers.ValidationError({"code": "This code has already been used or has expired."})
+        raise serializers.ValidationError({"code": _("This code has already been used or has expired.")})
     if inv.school.is_suspended:
-        raise serializers.ValidationError({"code": "This school's account is suspended."})
+        raise serializers.ValidationError({"code": _("This school's account is suspended.")})
     return inv
 
 
@@ -252,11 +253,11 @@ class InvitationAcceptView(APIView):
             email = str(request.data.get("email", "")).strip().lower()
             password = request.data.get("password", "")
             if not email or not password:
-                raise serializers.ValidationError({"email": "Email and password are required to create an account."})
+                raise serializers.ValidationError({"email": _("Email and password are required to create an account.")})
             existing = User.objects.filter(username__iexact=email).first()
             if existing:
                 if not existing.check_password(password):
-                    raise serializers.ValidationError({"email": "This email already has an account; the password does not match."})
+                    raise serializers.ValidationError({"email": _("This email already has an account; the password does not match.")})
                 user = existing
             else:
                 validate_password(password)
@@ -301,7 +302,7 @@ class SetupChecklistView(APIView):
             ("parents", counts["parents_joined"] > 0, "invitations"),
             ("timetable", counts["timetable_lessons"] > 0, "timetables"),
         ]
-        done = sum(1 for _, ok, _ in steps if ok)
+        done = sum(1 for _key, ok, _page in steps if ok)
         return Response({"steps": [{"key": k, "done": ok, "page": page} for k, ok, page in steps],
                          "done": done, "total": len(steps), "counts": counts})
 
@@ -320,7 +321,7 @@ class PlanSerializer(serializers.ModelSerializer):
     def validate_modules(self, value):
         unknown = set(value) - set(ALL_MODULES)
         if unknown:
-            raise serializers.ValidationError(f"Unknown modules: {', '.join(sorted(unknown))}")
+            raise serializers.ValidationError(_("Unknown modules: %(modules)s") % {"modules": ", ".join(sorted(unknown))})
         return value
 
 
@@ -403,7 +404,7 @@ class OwnerSchoolActionView(APIView):
             school.trial_ends_at = base + timedelta(days=days)
             school.status = "trial"
         else:
-            return Response({"error": "Unknown action."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": _("Unknown action.")}, status=status.HTTP_400_BAD_REQUEST)
         school.save()
         log(school, request.user, "update", school, summary=f"Platform owner: {action}")
         return Response({"id": school.id, "status": school.status, "plan": school.plan.code if school.plan else None,

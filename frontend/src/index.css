@@ -1,3 +1,46 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --brand-rgb: 37 99 235;
+  --brand: rgb(var(--brand-rgb));
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* Leaflet maps follow the page direction for controls but keep tiles LTR. */
+.leaflet-container {
+  direction: ltr;
+  font: inherit;
+  border-radius: 0.75rem;
+}
+
+/* Printable pages (report cards, receipts, driver sheets, timetables). */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+  .print-page {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+}

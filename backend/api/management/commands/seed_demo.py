@@ -29,7 +29,7 @@ from api.models import (
 
 User = get_user_model()
 
-DEMO_VERSION = 4
+DEMO_VERSION = 5
 DEMO_SCHOOL_NAME = "Amman Demo School"
 IRBID_SCHOOL_NAME = "Irbid Demo School"
 DEFAULT_DEMO_PASSWORD = "DemoSchool-2026"

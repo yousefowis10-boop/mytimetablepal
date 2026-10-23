@@ -6,7 +6,7 @@
     "watchPatterns": ["/backend/**"]
   },
   "deploy": {
-    "startCommand": "sh -c 'python manage.py migrate --noinput && (python manage.py seed_demo --if-missing &) ; exec gunicorn rest_app.wsgi --bind 0.0.0.0:$PORT --workers 3 --threads 4 --timeout 180 --access-logfile -'",
+    "startCommand": "sh -c 'python manage.py migrate --noinput && python manage.py ensure_owner && (python manage.py seed_demo --if-missing &) ; exec gunicorn rest_app.wsgi --bind 0.0.0.0:$PORT --workers 3 --threads 4 --timeout 180 --access-logfile -'",
     "healthcheckPath": "/api/health/",
     "healthcheckTimeout": 180,
     "restartPolicyType": "ON_FAILURE",

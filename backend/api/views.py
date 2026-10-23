@@ -1,3 +1,4 @@
+from django.utils.translation import gettext as _
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -231,7 +232,7 @@ class TimetableViewSet(SchoolScopedMixin, viewsets.ModelViewSet):
         entries_data = request.data.get("entries", [])
 
         if not isinstance(entries_data, list):
-            return Response({"error": "Entries must be a list."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": _("Entries must be a list.")}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = TimetableEntrySerializer(
             data=entries_data,
@@ -246,7 +247,7 @@ class TimetableViewSet(SchoolScopedMixin, viewsets.ModelViewSet):
         log(timetable.school, request.user, "update", timetable,
             summary=f"Timetable '{timetable.name}' edited: {before} -> {len(entries_data)} lessons",
             model="api.TimetableEntry", object_id=str(timetable.id))
-        return Response({"message": "Timetable entries updated successfully."},
+        return Response({"message": _("Timetable entries updated successfully.")},
                         status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'])
@@ -258,7 +259,7 @@ class TimetableViewSet(SchoolScopedMixin, viewsets.ModelViewSet):
     def precheck(self, request, pk=None, school_id=None):
         """GET /schools/{school_id}/timetables/{id}/precheck/ - fast check for impossible input."""
         from .scheduling.solver import precheck as run_precheck
-        problem, _ = build_problem(self.get_object())
+        problem, _kept = build_problem(self.get_object())
         reasons = run_precheck(problem)
         return Response({"ok": not reasons, "reasons": reasons})
 
@@ -334,18 +335,18 @@ class TeacherAvailabilityPeriodAPI(APIView):
         period = self.get_period(request, period_id)
         teacher_ids = request.data.get("teachers", [])
         if not isinstance(teacher_ids, list):
-            return Response({"error": "teachers must be a list of ids."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": _("teachers must be a list of ids.")}, status=status.HTTP_400_BAD_REQUEST)
 
         teachers = list(Teacher.objects.filter(school_id=period.schedule.school_id, id__in=teacher_ids))
         if len(teachers) != len(set(teacher_ids)):
-            return Response({"error": "Unknown teacher id for this school."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": _("Unknown teacher id for this school.")}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
             TeacherAvailablePeriod.objects.filter(period=period).delete()
             TeacherAvailablePeriod.objects.bulk_create(
                 [TeacherAvailablePeriod(teacher=t, period=period) for t in teachers]
             )
-        return Response({"message": "Availability updated!"})
+        return Response({"message": _("Availability updated!")})
 
 
 # ============== TIMETABLE SPECIAL VIEWS ==============
@@ -427,15 +428,15 @@ def start_generation(request, timetable):
         time_limit = request.data.get("time_limit")
         time_limit = None if time_limit in (None, "") else max(5, min(600, int(time_limit)))
     except (TypeError, ValueError):
-        return Response({"error": "group_ids/teacher_ids must be lists of ids and time_limit a number."},
+        return Response({"error": _("group_ids/teacher_ids must be lists of ids and time_limit a number.")},
                         status=status.HTTP_400_BAD_REQUEST)
     running = timetable.jobs.filter(status__in=("queued", "running")).first()
     if running and expire_stale(running).status in ("queued", "running"):
         return Response(TimetableJobSerializer(running).data, status=status.HTTP_409_CONFLICT)
     if not SchedulePeriod.objects.filter(schedule=timetable.schedule, type__in=("lecture", "lab")).exists():
-        return Response({"error": "The schedule has no lesson periods yet."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": _("The schedule has no lesson periods yet.")}, status=status.HTTP_400_BAD_REQUEST)
     if not SubjectRequirement.objects.filter(student_group__school=timetable.school).exists():
-        return Response({"error": "No subject requirements found. Add weekly lessons per group first."},
+        return Response({"error": _("No subject requirements found. Add weekly lessons per group first.")},
                         status=status.HTTP_400_BAD_REQUEST)
     params = {"group_ids": group_ids, "teacher_ids": teacher_ids}
     if time_limit:
@@ -467,21 +468,21 @@ class SolverSettingsView(APIView):
         cfg = solver_settings_for(SchoolAccess(request, school_id, module="timetable").school)
         weights = request.data.get("weights", {})
         if not isinstance(weights, dict):
-            return Response({"error": "weights must be an object."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": _("weights must be an object.")}, status=status.HTTP_400_BAD_REQUEST)
         clean = {}
         for key, value in weights.items():
             if key not in DEFAULT_SOLVER_WEIGHTS:
-                return Response({"error": f"Unknown weight: {key}"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": _("Unknown weight: %(key)s") % {"key": key}}, status=status.HTTP_400_BAD_REQUEST)
             try:
                 clean[key] = max(0, min(100, int(value)))
             except (TypeError, ValueError):
-                return Response({"error": f"Weight {key} must be a number 0-100."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": _("Weight %(key)s must be a number 0-100.") % {"key": key}}, status=status.HTTP_400_BAD_REQUEST)
         cfg.weights = clean
         if "time_limit_seconds" in request.data:
             try:
                 cfg.time_limit_seconds = max(5, min(600, int(request.data["time_limit_seconds"])))
             except (TypeError, ValueError):
-                return Response({"error": "time_limit_seconds must be a number."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": _("time_limit_seconds must be a number.")}, status=status.HTTP_400_BAD_REQUEST)
         cfg.save()
         return Response(self._data(cfg))
 

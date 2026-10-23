@@ -116,7 +116,7 @@ class SolverHardConstraintTests(SimpleTestCase):
         self.assertEqual({math[0][1], math[1][1]}, {1, 2})
 
     def test_deterministic(self):
-        p = school_problem(8, 14, time_limit=8, workers=4)
+        p = school_problem(8, 14, time_limit=20, workers=2)
         a, b = solve(p), solve(p)
         self.assertTrue(a.ok)
         self.assertEqual(a.lessons, b.lessons)

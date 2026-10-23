@@ -9,6 +9,7 @@ Rules:
 - Suspended schools are read-blocked; schools whose trial ended are read-only until a plan is active.
 - Plan modules switch whole features on and off.
 """
+from django.utils.translation import gettext as _
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions
 from rest_framework.exceptions import NotFound, PermissionDenied
@@ -40,15 +41,15 @@ class SchoolAccess:
         if not self.roles:
             raise NotFound()
         if self.school.is_suspended:
-            raise PermissionDenied("This school's account is suspended. Please contact support.")
+            raise PermissionDenied(_("This school's account is suspended. Please contact support."))
         writing = request.method not in SAFE
         if writing and self.school.trial_expired:
-            raise PermissionDenied("The free trial has ended. Choose a plan to keep making changes.")
+            raise PermissionDenied(_("The free trial has ended. Choose a plan to keep making changes."))
         if module and not self.school.has_module(module):
-            raise PermissionDenied(f"The '{module}' module is not part of this school's plan.")
+            raise PermissionDenied(_("This feature is not part of your school's plan."))
         allowed = write_roles if writing else read_roles
         if not (self.roles & set(allowed)):
-            raise PermissionDenied("Your role does not allow this.")
+            raise PermissionDenied(_("Your role does not allow this."))
 
     def has(self, *roles):
         return bool(self.roles & set(roles))

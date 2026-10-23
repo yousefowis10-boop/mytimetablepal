@@ -12,6 +12,8 @@ jobs:
         working-directory: backend
     env:
       DEBUG: "True"
+      ROUTING_PROVIDER_OVERRIDE: haversine
+      PYTHONIOENCODING: utf-8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -21,7 +23,12 @@ jobs:
           cache-dependency-path: backend/requirements*.txt
       - run: pip install -r requirements.txt
       - run: python manage.py makemigrations --check --dry-run
-      - run: python manage.py test api
+      - name: Every server message has an Arabic translation
+        run: python scripts/i18n.py check
+      - name: Unit, permission, isolation and solver tests
+        run: python manage.py test api ops transport
+      - name: Solver benchmark (demo-sized school)
+        run: python manage.py benchmark_solver --sizes 30x55 --time-limit 30
 
   frontend:
     runs-on: ubuntu-latest
@@ -37,6 +44,10 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
+      - name: Every on-screen string has an Arabic translation
+        run: node scripts/i18n-check.mjs
+      - name: Smoke tests
+        run: npm test
       - run: npm run build
         env:
           VITE_API_URL: https://example.invalid/api

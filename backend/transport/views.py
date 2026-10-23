@@ -1,3 +1,4 @@
+from django.utils.translation import gettext as _
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import serializers, status
@@ -7,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.access import SchoolAccess, log
+from api.i18n import tr
 from api.models import AuditLog
 from ops.common import MANAGERS, SchoolModelViewSet, my_children, parse_date
 from ops.models import Student
@@ -28,7 +30,7 @@ class TransportSettingsSerializer(serializers.ModelSerializer):
 
     def validate_max_ride_minutes(self, v):
         if not 5 <= v <= 180:
-            raise serializers.ValidationError("Use 5 to 180 minutes.")
+            raise serializers.ValidationError(_("Use 5 to 180 minutes."))
         return v
 
 
@@ -74,7 +76,7 @@ class LeaveOverrideSerializer(serializers.ModelSerializer):
 
     def validate_student(self, v):
         if v.school_id != self.context["school"].id:
-            raise serializers.ValidationError("Unknown student.")
+            raise serializers.ValidationError(_("Unknown student."))
         return v
 
 
@@ -93,10 +95,10 @@ class ManualRouteSerializer(serializers.ModelSerializer):
     def validate(self, data):
         school = self.context["school"]
         if data["bus"].school_id != school.id:
-            raise serializers.ValidationError("Unknown bus.")
+            raise serializers.ValidationError(_("Unknown bus."))
         ids = data.get("student_order") or []
         if Student.objects.filter(school=school, id__in=ids).count() != len(set(ids)):
-            raise serializers.ValidationError("Unknown student in the order.")
+            raise serializers.ValidationError(_("Unknown student in the order."))
         return data
 
 
@@ -121,9 +123,13 @@ def plan_payload(plan, with_students=True):
                        "students": [s.full_name for s in st.students.all()] if with_students else [],
                        "count": st.students.count()} for st in r.stops.all()],
         })
+    summary = dict(plan.summary or {})
+    for key in ("reasons", "provider_note", "fewer_buses_note"):
+        if summary.get(key):
+            summary[key] = tr(summary[key])
     return {"id": plan.id, "direction": plan.direction, "date": plan.date,
             "wave_time": plan.wave_time.strftime("%H:%M") if plan.wave_time else None,
-            "status": plan.status, "summary": plan.summary, "created_at": plan.created_at, "routes": routes}
+            "status": plan.status, "summary": summary, "created_at": plan.created_at, "routes": routes}
 
 
 class PlansView(APIView):
@@ -140,12 +146,12 @@ class PlansView(APIView):
         access = SchoolAccess(request, school_id, read_roles=MANAGERS, write_roles=MANAGERS, module=MODULE)
         direction = request.data.get("direction")
         if direction not in ("morning", "afternoon"):
-            raise ValidationError({"direction": "Choose morning or afternoon."})
+            raise ValidationError({"direction": _("Choose morning or afternoon.")})
         day = parse_date(request.data.get("date"), None)
         try:
             plans = plan_routes(access.school, direction, request.user, day)
         except PlanError as exc:
-            raise ValidationError({"error": str(exc)})
+            raise ValidationError({"error": tr(exc.args[0])})
         return Response([plan_payload(p) for p in plans], status=status.HTTP_201_CREATED)
 
 
@@ -199,21 +205,21 @@ class DriverRunActionView(APIView):
             try:
                 lat, lng = float(d["lat"]), float(d["lng"])
             except (KeyError, TypeError, ValueError):
-                raise ValidationError("lat and lng are required.")
+                raise ValidationError(_("lat and lng are required."))
             if not (-90 <= lat <= 90 and -180 <= lng <= 180):
-                raise ValidationError("Invalid coordinates.")
+                raise ValidationError(_("Invalid coordinates."))
             if run.status != "active":
-                raise ValidationError("Start the route first.")
+                raise ValidationError(_("Start the route first."))
             etas = record_location(run, lat, lng, d.get("accuracy"))
             return Response({"ok": True, "etas": etas, "delay_minutes": round(run.delay_minutes)})
         elif action == "event":
             kind = d.get("kind")
             if kind not in ("picked_up", "dropped_off", "absent"):
-                raise ValidationError({"kind": "picked_up, dropped_off or absent"})
+                raise ValidationError({"kind": _("picked_up, dropped_off or absent")})
             stop = get_object_or_404(RouteStop, id=d.get("stop"), route=run.route)
             student = stop.students.filter(id=d.get("student")).first()
             if not student:
-                raise ValidationError({"student": "This child is not at this stop."})
+                raise ValidationError({"student": _("This child is not at this stop.")})
             record_event(run, kind, student, stop)
         elif action == "arrived":
             stop = get_object_or_404(RouteStop, id=d.get("stop"), route=run.route)
@@ -221,7 +227,7 @@ class DriverRunActionView(APIView):
         elif action == "finish":
             finish_run(run)
         else:
-            raise ValidationError("Unknown action.")
+            raise ValidationError(_("Unknown action."))
         run.refresh_from_db()
         return Response(run_payload(run))
 

@@ -1,0 +1,801 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: ar\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5;\n"
+
+#: ops\views\fees.py:265
+msgid "%(amount)s %(currency)s for %(name)s (%(item)s) is due on %(day)s."
+msgstr "يستحق مبلغ %(amount)s %(currency)s عن %(name)s (%(item)s) يوم %(day)s."
+
+#: ops\views\fees.py:271
+msgid "%(amount)s %(currency)s for %(name)s (%(item)s) was due on %(day)s."
+msgstr "كان مبلغ %(amount)s %(currency)s عن %(name)s (%(item)s) مستحقاً يوم %(day)s."
+
+#: ops\views\fees.py:168
+msgid "%(amount)s %(currency)s for %(name)s. Receipt %(receipt)s."
+msgstr "%(amount)s %(currency)s عن %(name)s. رقم الإيصال %(receipt)s."
+
+#: transport\services.py:333
+msgid "%(bus)s is running about %(n)s minutes late."
+msgstr "%(bus)s متأخرة حوالي %(n)s دقيقة."
+
+#: transport\services.py:295
+msgid "%(bus)s started its route."
+msgstr "بدأت %(bus)s مسارها."
+
+#: transport\services.py:327
+msgid "%(bus)s will reach your stop in about %(n)s minute(s)."
+msgstr "ستصل %(bus)s إلى محطتك خلال %(n)s دقيقة تقريباً."
+
+#: api\scheduling\exams.py:68
+msgid "%(exam)s is sat by %(groups)s groups at the same time, but only %(rooms)s room(s) and %(teachers)s invigilator(s) are available."
+msgstr "امتحان %(exam)s تقدّمه %(groups)s شعب في الوقت نفسه، لكن المتاح %(rooms)s قاعة و%(teachers)s مراقب فقط."
+
+#: ops\views\data_io.py:187
+msgid "%(field)s must be a number"
+msgstr "يجب أن يكون %(field)s رقماً"
+
+#: api\scheduling\solver.py:269
+msgid "%(group)s %(subject)s asks for %(doubles)s double periods (%(needed)s lessons) but has only %(n)s lessons a week."
+msgstr "مادة %(subject)s للشعبة %(group)s تطلب %(doubles)s حصص مزدوجة (%(needed)s حصص) بينما لها %(n)s حصص أسبوعياً فقط."
+
+#: api\scheduling\solver.py:262
+msgid "%(group)s (%(size)s students) needs a %(room)s for %(subject)s, but no %(room)s holds %(size)s students."
+msgstr "الشعبة %(group)s (%(size)s طالباً) تحتاج %(room)s لمادة %(subject)s، لكن لا يوجد %(room)s يتسع لـ %(size)s طالباً."
+
+#: api\scheduling\exams.py:58
+msgid "%(group)s has %(n)s exams but the exam period allows at most %(cap)s (%(days)s days x %(per_day)s per day)."
+msgstr "للشعبة %(group)s عدد %(n)s امتحانات، بينما تسمح الفترة بـ %(cap)s كحد أقصى (%(days)s أيام × %(per_day)s يومياً)."
+
+#: api\scheduling\solver.py:265
+msgid "%(group)s has %(size)s students but no classroom is big enough."
+msgstr "في الشعبة %(group)s عدد %(size)s طالباً ولا توجد غرفة صفية تتسع لهم."
+
+#: api\scheduling\solver.py:282
+msgid "%(group)s needs %(n)s %(subject)s lessons but the only %(subject)s teachers (%(teachers)s) are available in %(free)s free periods for that group."
+msgstr "تحتاج الشعبة %(group)s إلى %(n)s حصص %(subject)s، لكن معلمي %(subject)s (%(teachers)s) متوفّرون في %(free)s حصص فارغة فقط لهذه الشعبة."
+
+#: api\scheduling\solver.py:243
+msgid "%(group)s needs %(n)s lessons a week but the week only has %(slots)s lesson periods."
+msgstr "تحتاج الشعبة %(group)s إلى %(n)s حصة أسبوعياً، بينما الأسبوع فيه %(slots)s حصة فقط."
+
+#: api\scheduling\solver.py:255
+msgid "%(group)s needs %(subject)s but no teacher is qualified to teach %(subject)s."
+msgstr "تحتاج الشعبة %(group)s إلى مادة %(subject)s ولا يوجد معلم مؤهل لتدريسها."
+
+#: api\scheduling\solver.py:582
+msgid "%(group)s: %(n)s %(subject)s lessons (%(doubles)s as double periods) with %(teacher)s"
+msgstr "%(group)s: %(n)s حصص %(subject)s (منها %(doubles)s مزدوجة) مع %(teacher)s"
+
+#: api\scheduling\solver.py:585
+msgid "%(group)s: %(n)s %(subject)s lessons with %(teacher)s"
+msgstr "%(group)s: %(n)s حصص %(subject)s مع %(teacher)s"
+
+#: ops\views\admissions.py:76
+msgid "%(n)s admission follow-up(s) due"
+msgstr "%(n)s متابعة قبول مستحقة"
+
+#: ops\views\staffing.py:114
+msgid "%(n)s lesson(s) need a cover."
+msgstr "%(n)s حصة تحتاج إلى معلم بديل."
+
+#: ops\views\pickup.py:92
+msgid "%(name)s has left school"
+msgstr "غادر %(name)s المدرسة"
+
+#: transport\services.py:352
+msgid "%(name)s was dropped off"
+msgstr "تم إنزال %(name)s"
+
+#: transport\services.py:353
+msgid "%(name)s was dropped off at %(time)s (%(bus)s)."
+msgstr "تم إنزال %(name)s الساعة %(time)s (%(bus)s)."
+
+#: ops\views\attendance.py:131
+msgid "%(name)s was marked absent"
+msgstr "سُجّل %(name)s غائباً"
+
+#: ops\views\attendance.py:132
+msgid "%(name)s was marked absent in %(period)s on %(day)s."
+msgstr "سُجّل %(name)s غائباً في %(period)s يوم %(day)s."
+
+#: ops\views\attendance.py:133
+msgid "%(name)s was marked absent on %(day)s."
+msgstr "سُجّل %(name)s غائباً يوم %(day)s."
+
+#: ops\views\attendance.py:135
+msgid "%(name)s was marked late"
+msgstr "سُجّل %(name)s متأخراً"
+
+#: ops\views\attendance.py:136
+msgid "%(name)s was marked late in %(period)s on %(day)s."
+msgstr "سُجّل %(name)s متأخراً في %(period)s يوم %(day)s."
+
+#: ops\views\attendance.py:137
+msgid "%(name)s was marked late on %(day)s."
+msgstr "سُجّل %(name)s متأخراً يوم %(day)s."
+
+#: transport\services.py:350
+msgid "%(name)s was picked up at %(time)s (%(bus)s)."
+msgstr "صعد %(name)s إلى الحافلة الساعة %(time)s (%(bus)s)."
+
+#: transport\services.py:349
+msgid "%(name)s was picked up by the bus"
+msgstr "صعد %(name)s إلى الحافلة"
+
+#: ops\views\staffing.py:153
+msgid "%(period)s: %(subject)s with %(group)s in %(room)s (for %(teacher)s)."
+msgstr "%(period)s: %(subject)s مع %(group)s في %(room)s (بدلاً من %(teacher)s)."
+
+#: api\scheduling\exams.py:73
+msgid "%(sittings)s sittings need a room and an invigilator, but %(sessions)s sessions x %(capacity)s rooms/invigilators is not enough."
+msgstr "%(sittings)s جلسة امتحان تحتاج قاعة ومراقباً، لكن %(sessions)s جلسات × %(capacity)s قاعات/مراقبين لا تكفي."
+
+#: ops\views\attendance.py:168
+msgid "%(start)s to %(end)s: %(reason)s"
+msgstr "من %(start)s إلى %(end)s: %(reason)s"
+
+#: api\scheduling\solver.py:294
+msgid "%(subject)s needs %(n)s lessons a week in total, but its %(teachers)s qualified teacher(s) can give at most %(capacity)s (availability and weekly limits)."
+msgstr "تحتاج مادة %(subject)s إلى %(n)s حصة أسبوعياً، لكن معلميها المؤهلين (%(teachers)s) يستطيعون تقديم %(capacity)s حصة كحد أقصى (حسب التوفّر والحدود الأسبوعية)."
+
+#: ops\views\staffing.py:113
+msgid "%(teacher)s is absent on %(day)s"
+msgstr "%(teacher)s غائب يوم %(day)s"
+
+#: ops\views\staffing.py:140
+msgid "%(teacher)s is not free in this period."
+msgstr "%(teacher)s غير متفرغ في هذه الحصة."
+
+#: ops\views\academics.py:68
+msgid "%(title)s - due %(day)s"
+msgstr "%(title)s - التسليم يوم %(day)s"
+
+#: transport\optimizer.py:91
+msgid "'%(stop)s' is %(minutes)s minutes from school by road, longer than the %(max)s-minute maximum ride."
+msgstr "المحطة «%(stop)s» تبعد %(minutes)s دقيقة عن المدرسة بالطريق، وهذا أطول من الحد الأقصى للرحلة (%(max)s دقيقة)."
+
+#: ops\views\attendance.py:167
+msgid "Absence reported: %(name)s"
+msgstr "إبلاغ عن غياب: %(name)s"
+
+#: transport\services.py:132
+msgid "Add at least one bus first."
+msgstr "أضف حافلة واحدة على الأقل أولاً."
+
+#: ops\serializers.py:354
+msgid "Add at least one fee item."
+msgstr "أضف بند رسوم واحداً على الأقل."
+
+#: ops\serializers.py:308
+msgid "Add at least one session like {\"start\": \"09:00\", \"end\": \"11:00\"}."
+msgstr "أضف جلسة واحدة على الأقل مثل {\"start\": \"09:00\", \"end\": \"11:00\"}."
+
+#: ops\views\admissions.py:46
+msgid "Already enrolled."
+msgstr "مسجّل مسبقاً."
+
+#: ops\serializers.py:361
+msgid "Amounts cannot be negative."
+msgstr "لا يمكن أن تكون المبالغ سالبة."
+
+#: api\serializer.py:39
+msgid "An account with this email already exists."
+msgstr "يوجد حساب بهذا البريد الإلكتروني."
+
+#: api\serializer.py:216
+msgid "Another subject in this school already uses this code."
+msgstr "هذا الرمز مستخدم لمادة أخرى في المدرسة."
+
+#: api\scheduling\solver.py:773
+msgid "Assigning teachers"
+msgstr "توزيع المعلمين"
+
+#: api\views.py:349
+msgid "Availability updated!"
+msgstr "تم تحديث التوفّر!"
+
+#: ops\serializers.py:155
+msgid "Choose a class group."
+msgstr "اختر شعبة."
+
+#: ops\views\data_io.py:111
+msgid "Choose a file."
+msgstr "اختر ملفاً."
+
+#: ops\serializers.py:153
+msgid "Choose a grade."
+msgstr "اختر صفاً."
+
+#: ops\serializers.py:157
+msgid "Choose a parent."
+msgstr "اختر ولي أمر."
+
+#: transport\views.py:149
+msgid "Choose morning or afternoon."
+msgstr "اختر الصباح أو بعد الظهر."
+
+#: ops\views\fees.py:83
+msgid "Choose students, groups or a grade."
+msgstr "اختر طلاباً أو شعباً أو صفاً."
+
+#: ops\views\attendance.py:93
+msgid "Choose the lesson period."
+msgstr "اختر الحصة."
+
+#: ops\views\staffing.py:152
+msgid "Cover on %(day)s"
+msgstr "حصة بديلة يوم %(day)s"
+
+#: api\serializer.py:87
+msgid "Double periods use two lessons each; too many for the weekly lessons."
+msgstr "كل حصة مزدوجة تستخدم حصتين؛ العدد أكبر من الحصص الأسبوعية."
+
+#: ops\serializers.py:372
+msgid "Each item needs a due date or installments."
+msgstr "كل بند يحتاج تاريخ استحقاق أو أقساطاً."
+
+#: ops\serializers.py:359
+msgid "Each item needs an amount."
+msgstr "كل بند يحتاج مبلغاً."
+
+#: api\platform.py:256
+msgid "Email and password are required to create an account."
+msgstr "البريد الإلكتروني وكلمة المرور مطلوبان لإنشاء حساب."
+
+#: api\views.py:235
+msgid "Entries must be a list."
+msgstr "يجب أن تكون الحصص قائمة."
+
+#: ops\views\fees.py:264
+msgid "Fee due soon"
+msgstr "رسوم تستحق قريباً"
+
+#: ops\views\fees.py:270
+msgid "Fee overdue"
+msgstr "رسوم متأخرة"
+
+#: api\scheduling\solver.py:794
+msgid "Found solution #%(n)s (penalty %(penalty)s)"
+msgstr "تم إيجاد الحل رقم %(n)s (نقاط الجزاء %(penalty)s)"
+
+#: api\timetable_jobs.py:159
+msgid "Generator error: %(error)s"
+msgstr "خطأ في المولّد: %(error)s"
+
+#: ops\views\pickup.py:93
+msgid "Handed over to %(who)s at %(time)s."
+msgstr "تم التسليم إلى %(who)s الساعة %(time)s."
+
+#: ops\views\academics.py:67
+msgid "Homework: %(subject)s"
+msgstr "واجب: %(subject)s"
+
+#: ops\serializers.py:401
+msgid "Installments must add up to the amount minus discount."
+msgstr "يجب أن يساوي مجموع الأقساط المبلغ مطروحاً منه الخصم."
+
+#: ops\serializers.py:367
+msgid "Installments of '%(item)s' add up to %(total)s, not %(amount)s."
+msgstr "مجموع أقساط «%(item)s» هو %(total)s وليس %(amount)s."
+
+#: ops\views\attendance.py:121
+msgid "Invalid attendance record: %(record)s"
+msgstr "سجل حضور غير صالح: %(record)s"
+
+#: ops\serializers.py:88
+msgid "Invalid coordinate."
+msgstr "إحداثية غير صالحة."
+
+#: transport\views.py:210
+msgid "Invalid coordinates."
+msgstr "إحداثيات غير صالحة."
+
+#: api\serializer.py:260
+msgid "Invalid day of the week: %(value)s"
+msgstr "يوم غير صالح: %(value)s"
+
+#: api\account_views.py:61
+msgid "Invalid endpoint."
+msgstr "عنوان غير صالح."
+
+#: api\account_views.py:59
+msgid "Invalid subscription."
+msgstr "اشتراك غير صالح."
+
+#: api\scheduling\solver.py:303
+msgid "Lessons needing a %(room)s: %(n)s a week, but the %(rooms)s room(s) of that type offer only %(free)s free periods."
+msgstr "الحصص التي تحتاج %(room)s: %(n)s أسبوعياً، لكن الغرف من هذا النوع (%(rooms)s) توفّر %(free)s حصة فارغة فقط."
+
+#: api\serializer.py:149
+msgid "Logo is too large; please use an image under 300 KB."
+msgstr "الشعار كبير جداً؛ استخدم صورة أصغر من 300 كيلوبايت."
+
+#: ops\views\comms.py:197
+msgid "New message: %(subject)s"
+msgstr "رسالة جديدة: %(subject)s"
+
+#: transport\optimizer.py:79
+msgid "No active buses. Add at least one bus."
+msgstr "لا توجد حافلات فعّالة. أضف حافلة واحدة على الأقل."
+
+#: api\scheduling\exams.py:143
+msgid "No free room for %(group)s (%(exam)s)."
+msgstr "لا توجد قاعة متاحة للشعبة %(group)s (%(exam)s)."
+
+#: api\scheduling\exams.py:64
+msgid "No room holds %(group)s (%(size)s students)."
+msgstr "لا توجد قاعة تتسع للشعبة %(group)s (%(size)s طالباً)."
+
+#: ops\views\comms.py:154
+msgid "No school"
+msgstr "لا دوام"
+
+#: ops\views\comms.py:154
+msgid "No school - %(reason)s"
+msgstr "لا دوام - %(reason)s"
+
+#: ops\views\comms.py:157
+msgid "No school on %(day)s"
+msgstr "لا دوام يوم %(day)s"
+
+#: transport\optimizer.py:166
+msgid "No set of routes fits the seats and the maximum ride time. Add buses or allow longer rides."
+msgstr "لا توجد مسارات تناسب عدد المقاعد والحد الأقصى لوقت الرحلة. أضف حافلات أو اسمح برحلات أطول."
+
+#: api\views.py:439
+msgid "No subject requirements found. Add weekly lessons per group first."
+msgstr "لا توجد متطلبات للمواد. أضف الحصص الأسبوعية لكل شعبة أولاً."
+
+#: ops\views\academics.py:189
+msgid "No terms are set up yet."
+msgstr "لم تُحدَّد الفصول الدراسية بعد."
+
+#: api\scheduling\solver.py:814
+msgid "No timetable satisfies all the rules together. Check teacher availability, room types and lessons per week for the busiest groups and teachers."
+msgstr "لا يوجد جدول يحقق جميع القواعد معاً. راجع توفّر المعلمين وأنواع الغرف وعدد الحصص الأسبوعية لأكثر الشعب والمعلمين انشغالاً."
+
+#: ops\views\data_io.py:354
+msgid "No timetable yet."
+msgstr "لا يوجد جدول بعد."
+
+#: api\timetable_jobs.py:151
+msgid "No valid timetable exists with the current data."
+msgstr "لا يوجد جدول صالح بالبيانات الحالية."
+
+#: api\scheduling\solver.py:819
+msgid "No valid timetable was found within %(seconds)s seconds. Try a longer time limit, or check the busiest teachers and rooms."
+msgstr "لم يتم إيجاد جدول صالح خلال %(seconds)s ثانية. جرّب مهلة أطول، أو راجع أكثر المعلمين والغرف انشغالاً."
+
+#: transport\optimizer.py:81
+msgid "Not enough seats: %(children)s children ride in the %(direction)s, but the %(buses)s bus(es) have %(seats)s seats."
+msgstr "المقاعد لا تكفي: %(children)s طفلاً يستخدمون الحافلات في فترة %(direction)s، والحافلات (%(buses)s) فيها %(seats)s مقعداً فقط."
+
+#: api\scheduling\solver.py:368
+msgid "Not enough teacher time: the qualified teachers' availability and weekly limits cannot cover every group's lessons at once. Add teachers, widen availability, or reduce lessons per week."
+msgstr "وقت المعلمين لا يكفي: توفّر المعلمين المؤهلين وحدودهم الأسبوعية لا تغطي حصص جميع الشعب. أضف معلمين أو وسّع أوقات التوفّر أو قلّل الحصص الأسبوعية."
+
+#: ops\views\academics.py:73
+msgid "Not your homework."
+msgstr "هذا الواجب ليس لك."
+
+#: transport\optimizer.py:210
+msgid "Only %(k)s of %(v)s buses are needed to serve every child within the limits (rides get longer with fewer buses)."
+msgstr "يكفي %(k)s حافلات من أصل %(v)s لخدمة جميع الأطفال ضمن الحدود (تطول الرحلات مع تقليل الحافلات)."
+
+#: ops\views\data_io.py:337
+msgid "Only admin and staff export fees."
+msgstr "تصدير الرسوم متاح للإدارة والموظفين فقط."
+
+#: ops\views\staffing.py:133
+msgid "Only admin or staff approve covers."
+msgstr "اعتماد الحصص البديلة متاح للإدارة والموظفين فقط."
+
+#: api\platform.py:166
+msgid "Only admins can invite admins."
+msgstr "يمكن للمديرين فقط دعوة مديرين."
+
+#: ops\serializers.py:107
+msgid "Parent name is required."
+msgstr "اسم ولي الأمر مطلوب."
+
+#: ops\views\fees.py:167
+msgid "Payment received"
+msgstr "تم استلام دفعة"
+
+#: api\timetable_jobs.py:149
+msgid "Placed %(n)s lessons (kept %(k)s)."
+msgstr "تم توزيع %(n)s حصة (مع إبقاء %(k)s)."
+
+#: api\scheduling\solver.py:779
+msgid "Placing lessons"
+msgstr "توزيع الحصص"
+
+#: ops\views\data_io.py:73
+msgid "Please import at most 5,000 rows at a time."
+msgstr "يرجى استيراد 5000 سطر كحد أقصى في كل مرة."
+
+#: api\scheduling\solver.py:831
+msgid "Polishing"
+msgstr "تحسين نهائي"
+
+#: api\timetable_jobs.py:128
+msgid "Preparing data"
+msgstr "تجهيز البيانات"
+
+#: api\timetable_jobs.py:166
+msgid "Queued"
+msgstr "في الانتظار"
+
+#: ops\views\comms.py:213
+msgid "Reply from school: %(subject)s"
+msgstr "رد من المدرسة: %(subject)s"
+
+#: ops\views\comms.py:210
+msgid "Reply: %(subject)s"
+msgstr "رد: %(subject)s"
+
+#: transport\routing.py:185
+msgid "Road distances from %(provider)s were unavailable (%(error)s); straight-line estimates were used."
+msgstr "تعذّر الحصول على مسافات الطرق من %(provider)s (%(error)s)؛ استُخدمت تقديرات بخط مستقيم."
+
+#: ops\views\comms.py:158
+msgid "School is closed on this day."
+msgstr "المدرسة مغلقة في هذا اليوم."
+
+#: ops\views\academics.py:131
+msgid "Scores must be between 0 and %(max)s."
+msgstr "يجب أن تكون العلامات بين 0 و%(max)s."
+
+#: transport\services.py:129
+msgid "Set the school's location on the map first (Settings)."
+msgstr "حدّد موقع المدرسة على الخريطة أولاً (الإعدادات)."
+
+#: api\timetable_jobs.py:153
+msgid "Solver stopped without a timetable."
+msgstr "توقف المحسّن دون إنتاج جدول."
+
+#: transport\views.py:212
+msgid "Start the route first."
+msgstr "ابدأ المسار أولاً."
+
+#: ops\views\academics.py:126
+msgid "Student %(student)s is not in %(group)s."
+msgstr "الطالب %(student)s ليس في %(group)s."
+
+#: ops\views\staffing.py:107
+msgid "Teachers can only report their own absence."
+msgstr "يمكن للمعلم الإبلاغ عن غيابه هو فقط."
+
+#: ops\serializers.py:160
+msgid "Teachers can only send announcements to their class groups."
+msgstr "يمكن للمعلمين إرسال الإعلانات لشعبهم فقط."
+
+#: ops\serializers.py:441
+msgid "The amount must be more than zero."
+msgstr "يجب أن يكون المبلغ أكبر من صفر."
+
+#: api\scheduling\solver.py:235
+msgid "The bell schedule has no lesson periods (or the school week has no days), so nothing can be scheduled."
+msgstr "جدول الحصص لا يحتوي حصصاً دراسية (أو لا توجد أيام دوام)، لذا لا يمكن جدولة شيء."
+
+#: api\scheduling\solver.py:273
+msgid "The bell schedule has no two back-to-back lesson periods, so double periods (asked for %(group)s %(subject)s) are impossible."
+msgstr "لا توجد في جدول الحصص حصتان متتاليتان، لذلك الحصص المزدوجة (المطلوبة لـ %(group)s %(subject)s) غير ممكنة."
+
+#: transport\services.py:326
+msgid "The bus is almost at your stop"
+msgstr "الحافلة على وشك الوصول إلى محطتك"
+
+#: transport\services.py:294
+msgid "The bus is on its way"
+msgstr "الحافلة في الطريق"
+
+#: transport\services.py:332
+msgid "The bus is running late"
+msgstr "الحافلة متأخرة"
+
+#: transport\services.py:294
+msgid "The bus left school"
+msgstr "غادرت الحافلة المدرسة"
+
+#: ops\serializers.py:264
+msgid "The due date is before the assigned date."
+msgstr "تاريخ التسليم قبل تاريخ التحديد."
+
+#: ops\serializers.py:171
+msgid "The end date is before the start date."
+msgstr "تاريخ النهاية قبل تاريخ البداية."
+
+#: api\scheduling\exams.py:49
+msgid "The exam period has no sessions. Add dates and at least one session per day."
+msgstr "لا توجد جلسات في فترة الامتحانات. أضف التواريخ وجلسة واحدة على الأقل يومياً."
+
+#: api\scheduling\exams.py:124
+msgid "The exams cannot be fitted without a clash. Add exam days or sessions, or allow more exams per day."
+msgstr "لا يمكن توزيع الامتحانات دون تعارض. أضف أيام أو جلسات امتحانات، أو اسمح بعدد أكبر يومياً."
+
+#: ops\views\data_io.py:65
+msgid "The file is empty."
+msgstr "الملف فارغ."
+
+#: api\access.py:47
+msgid "The free trial has ended. Choose a plan to keep making changes."
+msgstr "انتهت الفترة التجريبية المجانية. اختر خطة لمتابعة إجراء التغييرات."
+
+#: api\timetable_jobs.py:182
+msgid "The generator was interrupted (server restart). Please run it again."
+msgstr "توقف المولّد (إعادة تشغيل الخادم). يرجى تشغيله مرة أخرى."
+
+#: api\views.py:437
+msgid "The schedule has no lesson periods yet."
+msgstr "لا توجد حصص دراسية في جدول الحصص بعد."
+
+#: transport\optimizer.py:87
+msgid "The stop '%(stop)s' has %(n)s children but the largest bus has %(seats)s seats."
+msgstr "في المحطة «%(stop)s» عدد %(n)s أطفال، بينما أكبر حافلة فيها %(seats)s مقعداً."
+
+#: api\scheduling\solver.py:589
+msgid "These lessons cannot all be placed together without a clash (same group, teacher or room at the same time, or outside teacher availability): %(lessons)s."
+msgstr "لا يمكن توزيع هذه الحصص معاً دون تعارض (الشعبة أو المعلم أو الغرفة نفسها في الوقت نفسه، أو خارج أوقات توفّر المعلم): %(lessons)s."
+
+#: transport\optimizer.py:203
+msgid "These stops could not be served within the seats and the maximum ride time: %(stops)s. Add a bus or allow a longer ride."
+msgstr "تعذّر خدمة هذه المحطات ضمن المقاعد والحد الأقصى لوقت الرحلة: %(stops)s. أضف حافلة أو اسمح برحلة أطول."
+
+#: ops\views\comms.py:96
+msgid "This announcement was already sent and can no longer be edited."
+msgstr "أُرسل هذا الإعلان ولا يمكن تعديله الآن."
+
+#: transport\views.py:222
+msgid "This child is not at this stop."
+msgstr "هذا الطفل ليس في هذه المحطة."
+
+#: api\platform.py:217
+msgid "This code has already been used or has expired."
+msgstr "هذا الرمز مستخدم أو منتهي الصلاحية."
+
+#: api\platform.py:66
+msgid "This email already has an account. Log in and add a school from there."
+msgstr "يوجد حساب بهذا البريد. سجّل الدخول وأضف مدرسة من هناك."
+
+#: api\platform.py:260
+msgid "This email already has an account; the password does not match."
+msgstr "يوجد حساب بهذا البريد، لكن كلمة المرور غير مطابقة."
+
+#: api\access.py:49
+msgid "This feature is not part of your school's plan."
+msgstr "هذه الميزة ليست ضمن خطة مدرستك."
+
+#: ops\views\staffing.py:137
+msgid "This lesson is not affected by the absence."
+msgstr "هذه الحصة لا تتأثر بالغياب."
+
+#: api\platform.py:219
+msgid "This school's account is suspended."
+msgstr "حساب هذه المدرسة موقوف."
+
+#: api\access.py:44
+msgid "This school's account is suspended. Please contact support."
+msgstr "حساب هذه المدرسة موقوف. يرجى التواصل مع الدعم."
+
+#: api\views.py:250
+msgid "Timetable entries updated successfully."
+msgstr "تم تحديث حصص الجدول بنجاح."
+
+#: api\platform.py:407
+msgid "Unknown action."
+msgstr "إجراء غير معروف."
+
+#: api\platform.py:164
+msgid "Unknown bus."
+msgstr "حافلة غير معروفة."
+
+#: ops\serializers.py:337
+msgid "Unknown exam period."
+msgstr "فترة امتحانات غير معروفة."
+
+#: ops\views\data_io.py:369
+msgid "Unknown export."
+msgstr "نوع تصدير غير معروف."
+
+#: ops\views\people.py:41
+msgid "Unknown group."
+msgstr "شعبة غير معروفة."
+
+#: ops\views\data_io.py:95
+msgid "Unknown import type."
+msgstr "نوع استيراد غير معروف."
+
+#: api\platform.py:324
+msgid "Unknown modules: %(modules)s"
+msgstr "وحدات غير معروفة: %(modules)s"
+
+#: api\platform.py:160
+msgid "Unknown parent."
+msgstr "ولي أمر غير معروف."
+
+#: transport\views.py:101
+msgid "Unknown student in the order."
+msgstr "طالب غير معروف في الترتيب."
+
+#: ops\views\attendance.py:163
+msgid "Unknown student."
+msgstr "طالب غير معروف."
+
+#: api\views.py:342
+msgid "Unknown teacher id for this school."
+msgstr "معلم غير معروف في هذه المدرسة."
+
+#: api\platform.py:156
+msgid "Unknown teacher."
+msgstr "معلم غير معروف."
+
+#: api\views.py:475
+msgid "Unknown weight: %(key)s"
+msgstr "معيار غير معروف: %(key)s"
+
+#: api\serializer.py:147
+msgid "Upload a PNG, JPEG or WebP image."
+msgstr "ارفع صورة بصيغة PNG أو JPEG أو WebP."
+
+#: ops\views\data_io.py:63
+msgid "Upload an .xlsx or .csv file."
+msgstr "ارفع ملفاً بصيغة ‎.xlsx أو ‎.csv."
+
+#: transport\views.py:33
+msgid "Use 5 to 180 minutes."
+msgstr "استخدم من 5 إلى 180 دقيقة."
+
+#: ops\views\attendance.py:228
+msgid "Use YYYY-MM."
+msgstr "استخدم الصيغة YYYY-MM."
+
+#: api\serializer.py:160
+msgid "Use a 3-letter currency code such as JOD."
+msgstr "استخدم رمز عملة من 3 أحرف مثل JOD."
+
+#: api\serializer.py:155
+msgid "Use a colour like #2563eb."
+msgstr "استخدم لوناً مثل ‎#2563eb."
+
+#: api\serializer.py:166
+msgid "Use a list like [{\"min\": 90, \"label\": \"A\"}]."
+msgstr "استخدم قائمة مثل [{\"min\": 90, \"label\": \"A\"}]."
+
+#: api\serializer.py:175
+msgid "Use day numbers 1-7 separated by commas (7=Sunday), no repeats."
+msgstr "استخدم أرقام الأيام 1-7 مفصولة بفواصل (7=الأحد) دون تكرار."
+
+#: api\serializer.py:173
+msgid "Use day numbers 1-7 separated by commas (7=Sunday)."
+msgstr "استخدم أرقام الأيام 1-7 مفصولة بفواصل (7=الأحد)."
+
+#: ops\common.py:72
+msgid "Use the format YYYY-MM-DD."
+msgstr "استخدم الصيغة YYYY-MM-DD."
+
+#: api\views.py:479
+msgid "Weight %(key)s must be a number 0-100."
+msgstr "يجب أن يكون المعيار %(key)s رقماً من 0 إلى 100."
+
+#: ops\views\pickup.py:43
+msgid "Who is picking up?"
+msgstr "مَن سيستلم الطفل؟"
+
+#: ops\views\comms.py:204
+msgid "Write a message."
+msgstr "اكتب رسالة."
+
+#: ops\views\academics.py:111
+msgid "You can only grade groups and subjects you teach."
+msgstr "يمكنك وضع العلامات فقط للشعب والمواد التي تدرّسها."
+
+#: ops\views\comms.py:88
+msgid "You can only message groups you teach."
+msgstr "يمكنك مراسلة الشعب التي تدرّسها فقط."
+
+#: ops\views\academics.py:62
+msgid "You can only set homework for groups and subjects you teach."
+msgstr "يمكنك تحديد الواجبات فقط للشعب والمواد التي تدرّسها."
+
+#: ops\views\attendance.py:96
+msgid "You do not teach this group at this time."
+msgstr "أنت لا تدرّس هذه الشعبة في هذا الوقت."
+
+#: ops\serializers.py:84
+msgid "Your plan allows %(n)s students. Upgrade the plan to add more."
+msgstr "تسمح خطتك بـ %(n)s طالب. قم بترقية الخطة لإضافة المزيد."
+
+#: api\access.py:52
+msgid "Your role does not allow this."
+msgstr "دورك لا يسمح بهذا الإجراء."
+
+#: transport\optimizer.py:17
+msgid "afternoon"
+msgstr "بعد الظهر"
+
+#: ops\views\data_io.py:155
+msgid "capacity must be a number"
+msgstr "يجب أن تكون السعة رقماً"
+
+#: ops\views\data_io.py:242
+msgid "class group '%(group)s' not found"
+msgstr "الشعبة «%(group)s» غير موجودة"
+
+#: api\scheduling\solver.py:42
+msgid "computer lab"
+msgstr "مختبر حاسوب"
+
+#: ops\views\data_io.py:249
+msgid "date_of_birth must be YYYY-MM-DD"
+msgstr "يجب أن يكون تاريخ الميلاد بالصيغة YYYY-MM-DD"
+
+#: ops\views\data_io.py:238
+msgid "first_name is required"
+msgstr "الاسم الأول مطلوب"
+
+#: api\views.py:431
+msgid "group_ids/teacher_ids must be lists of ids and time_limit a number."
+msgstr "يجب أن تكون الشعب والمعلمون قوائم أرقام، والمهلة رقماً."
+
+#: api\scheduling\solver.py:43
+msgid "gym / sports area"
+msgstr "صالة رياضية / ملعب"
+
+#: transport\views.py:208
+msgid "lat and lng are required."
+msgstr "خط العرض وخط الطول مطلوبان."
+
+#: transport\optimizer.py:17
+msgid "morning"
+msgstr "الصباح"
+
+#: ops\views\data_io.py:135
+msgid "name and code are required"
+msgstr "الاسم والرمز مطلوبان"
+
+#: transport\views.py:218
+msgid "picked_up, dropped_off or absent"
+msgstr "صعد أو نزل أو غائب"
+
+#: ops\views\data_io.py:256
+msgid "plan limit of %(n)s students reached"
+msgstr "تم بلوغ حد الخطة (%(n)s طالب)"
+
+#: api\scheduling\solver.py:40
+msgid "regular classroom"
+msgstr "غرفة صفية عادية"
+
+#: ops\views\data_io.py:179
+msgid "room '%(room)s' not found - import rooms first"
+msgstr "الغرفة «%(room)s» غير موجودة - استورد الغرف أولاً"
+
+#: api\scheduling\solver.py:41
+msgid "science lab"
+msgstr "مختبر علوم"
+
+#: api\scheduling\solver.py:44
+msgid "special room"
+msgstr "غرفة خاصة"
+
+#: api\views.py:338
+msgid "teachers must be a list of ids."
+msgstr "يجب أن يكون المعلمون قائمة أرقام."
+
+#: api\views.py:485
+msgid "time_limit_seconds must be a number."
+msgstr "يجب أن تكون المهلة رقماً."
+
+#: ops\views\data_io.py:139
+msgid "unknown room type '%(type)s'"
+msgstr "نوع غرفة غير معروف «%(type)s»"
+
+#: ops\views\data_io.py:209
+msgid "unknown subject(s): %(subjects)s"
+msgstr "مواد غير معروفة: %(subjects)s"
+
+#: api\views.py:471
+msgid "weights must be an object."
+msgstr "يجب أن تكون المعايير كائناً."

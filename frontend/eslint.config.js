@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'dev-dist']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
@@ -23,7 +23,7 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', ignoreRestSiblings: true }],
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^[A-Z_]', ignoreRestSiblings: true }],
     },
   },
   {
@@ -33,7 +33,7 @@ export default defineConfig([
   },
   {
     // Context modules export a provider plus its hook; fast refresh reloads them fully, which is fine.
-    files: ['src/context/**/*.jsx'],
+    files: ['src/auth/**/*.jsx', 'src/components/**/*.jsx', 'src/pages/**/*.jsx'],
     rules: { 'react-refresh/only-export-components': 'off' },
   },
 ])

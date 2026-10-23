@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 
 from ortools.sat.python import cp_model
 
+from .messages import Msg
+
 
 @dataclass(frozen=True)
 class ExamIn:
@@ -44,7 +46,7 @@ class ExamResult:
 def precheck(p: ExamProblem):
     reasons = []
     if not p.slots:
-        return ["The exam period has no sessions. Add dates and at least one session per day."]
+        return [Msg("The exam period has no sessions. Add dates and at least one session per day.")]
     per_group = defaultdict(int)
     for e in p.exams:
         for g in e.group_ids:
@@ -53,21 +55,24 @@ def precheck(p: ExamProblem):
     for g, n in per_group.items():
         cap = min(len(p.slots), days * p.max_per_day)
         if n > cap:
-            reasons.append(f"{p.groups[g][0]} has {n} exams but the exam period allows at most {cap} "
-                           f"({days} days x {p.max_per_day} per day).")
+            reasons.append(Msg("%(group)s has %(n)s exams but the exam period allows at most %(cap)s "
+                               "(%(days)s days x %(per_day)s per day).", group=p.groups[g][0], n=n, cap=cap,
+                               days=days, per_day=p.max_per_day))
     caps = sorted((c for _, _, c in p.rooms), reverse=True)
     for g, (name, size) in p.groups.items():
         if per_group.get(g) and (not caps or caps[0] < size):
-            reasons.append(f"No room holds {name} ({size} students).")
+            reasons.append(Msg("No room holds %(group)s (%(size)s students).", group=name, size=size))
     capacity = min(len(p.rooms), len(p.teachers))
     for e in p.exams:
         if len(e.group_ids) > capacity:
-            reasons.append(f"{e.name} is sat by {len(e.group_ids)} groups at the same time, but only {len(p.rooms)} "
-                           f"room(s) and {len(p.teachers)} invigilator(s) are available.")
+            reasons.append(Msg("%(exam)s is sat by %(groups)s groups at the same time, but only %(rooms)s room(s) "
+                               "and %(teachers)s invigilator(s) are available.", exam=e.name, groups=len(e.group_ids),
+                               rooms=len(p.rooms), teachers=len(p.teachers)))
     sittings = sum(len(e.group_ids) for e in p.exams)
     if sittings > len(p.slots) * min(len(p.rooms), len(p.teachers)):
-        reasons.append(f"{sittings} sittings need a room and an invigilator, but {len(p.slots)} sessions x "
-                       f"{min(len(p.rooms), len(p.teachers))} rooms/invigilators is not enough.")
+        reasons.append(Msg("%(sittings)s sittings need a room and an invigilator, but %(sessions)s sessions x "
+                           "%(capacity)s rooms/invigilators is not enough.", sittings=sittings, sessions=len(p.slots),
+                           capacity=min(len(p.rooms), len(p.teachers))))
     return reasons
 
 
@@ -116,7 +121,7 @@ def solve_exams(p: ExamProblem) -> ExamResult:
     st = solver.Solve(m)
     if st not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         return ExamResult("infeasible", reasons=[
-            "The exams cannot be fitted without a clash. Add exam days or sessions, or allow more exams per day."],
+            Msg("The exams cannot be fitted without a clash. Add exam days or sessions, or allow more exams per day.")],
             stats={"status": solver.StatusName(st)})
     placements = {}
     for (eid, s), v in x.items():
@@ -135,7 +140,7 @@ def solve_exams(p: ExamProblem) -> ExamResult:
             size = p.groups[g][1]
             room = next((r for r in free_rooms if r[2] >= size), None)
             if room is None:
-                problems.append(f"No free room for {p.groups[g][0]} ({e.name}).")
+                problems.append(Msg("No free room for %(group)s (%(exam)s).", group=p.groups[g][0], exam=e.name))
                 continue
             free_rooms.remove(room)
             candidates = [t for t in p.teachers if t[0] not in busy_teachers]

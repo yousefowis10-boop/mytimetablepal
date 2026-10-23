@@ -1,5 +1,6 @@
 from collections import Counter
 
+from django.utils.translation import gettext as _
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -12,6 +13,7 @@ from rest_framework.views import APIView
 from api.access import SchoolAccess, log
 from api.models import Teacher, TeacherAvailablePeriod, TimetableEntry
 from api.notify import notify
+from api.scheduling.messages import Msg
 
 from ..common import MANAGERS, SchoolModelViewSet, active_timetable, parse_date, teacher_for, week_bounds
 from ..models import CoverAssignment, TeacherAbsence
@@ -102,14 +104,14 @@ class TeacherAbsenceViewSet(SchoolModelViewSet):
         if not access.is_manager:
             me = teacher_for(self.request.user, access.school)
             if not me or serializer.validated_data["teacher"].id != me.id:
-                raise PermissionDenied("Teachers can only report their own absence.")
+                raise PermissionDenied(_("Teachers can only report their own absence."))
         absence = serializer.save(school=access.school, created_by=self.request.user)
         self.audit("create", absence)
         from ..common import staff_users
         lessons = affected_entries(absence)
         notify(access.school, staff_users(access.school), "teacher_absence",
-               f"{absence.teacher.name} is absent on {absence.date}",
-               f"{len(lessons)} lesson(s) need a cover.", link="/substitutes")
+               Msg("%(teacher)s is absent on %(day)s", teacher=absence.teacher.name, day=absence.date),
+               Msg("%(n)s lesson(s) need a cover.", n=len(lessons)), link="/substitutes")
 
     def retrieve(self, request, *args, **kwargs):
         absence = self.get_object()
@@ -128,16 +130,16 @@ class TeacherAbsenceViewSet(SchoolModelViewSet):
         """POST {"entry": id, "teacher": id} - one-click approval of a substitute."""
         access = self.get_access()
         if not access.is_manager:
-            raise PermissionDenied("Only admin or staff approve covers.")
+            raise PermissionDenied(_("Only admin or staff approve covers."))
         absence = self.get_object()
         entry = get_object_or_404(TimetableEntry, id=request.data.get("entry"), timetable__school=access.school)
         if entry.id not in {e.id for e in affected_entries(absence)}:
-            raise ValidationError({"entry": "This lesson is not affected by the absence."})
+            raise ValidationError({"entry": _("This lesson is not affected by the absence.")})
         teacher = get_object_or_404(Teacher, id=request.data.get("teacher"), school=access.school)
         if teacher.id not in {s["teacher_id"] for s in suggest_substitutes(entry, absence.date, limit=1000)}:
-            raise ValidationError({"teacher": f"{teacher.name} is not free in this period."})
+            raise ValidationError({"teacher": _("%(teacher)s is not free in this period.") % {"teacher": teacher.name}})
         with transaction.atomic():
-            cover, _ = CoverAssignment.objects.update_or_create(
+            cover, _created = CoverAssignment.objects.update_or_create(
                 entry=entry, date=absence.date,
                 defaults={"school": access.school, "absence": absence, "covering_teacher": teacher,
                           "approved_by": request.user})
@@ -147,9 +149,10 @@ class TeacherAbsenceViewSet(SchoolModelViewSet):
         log(access.school, request.user, "update", entry,
             summary=f"Cover {absence.date}: {teacher.name} for {entry}")
         if teacher.user_id:
-            notify(access.school, [teacher.user], "cover", f"Cover on {absence.date:%A %d %B}",
-                   f"{entry.period.name}: {entry.subject.name} with {entry.student_group.name} in {entry.classroom.name} "
-                   f"(for {absence.teacher.name}).", link="/today")
+            notify(access.school, [teacher.user], "cover", Msg("Cover on %(day)s", day=absence.date),
+                   Msg("%(period)s: %(subject)s with %(group)s in %(room)s (for %(teacher)s).", period=entry.period.name,
+                       subject=entry.subject.name, group=entry.student_group.name, room=entry.classroom.name,
+                       teacher=absence.teacher.name), link="/today")
         return Response(CoverSerializer(cover).data, status=201)
 
     @action(detail=True, methods=["post"], url_path="unassign")

@@ -4,6 +4,7 @@ import io
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
+from django.utils.translation import gettext as _
 from django.db import transaction
 from django.http import HttpResponse
 from django.utils import timezone
@@ -59,9 +60,9 @@ def read_rows(upload):
         ws = wb.worksheets[0]
         rows = [["" if c is None else c for c in r] for r in ws.iter_rows(values_only=True)]
     else:
-        raise ValidationError({"file": "Upload an .xlsx or .csv file."})
+        raise ValidationError({"file": _("Upload an .xlsx or .csv file.")})
     if not rows:
-        raise ValidationError({"file": "The file is empty."})
+        raise ValidationError({"file": _("The file is empty.")})
     header = [str(h).strip().lower().replace(" ", "_") for h in rows[0]]
     out = []
     for i, r in enumerate(rows[1:], start=2):
@@ -69,7 +70,7 @@ def read_rows(upload):
             continue
         out.append((i, {header[j]: (r[j] if j < len(r) else "") for j in range(len(header))}))
     if len(out) > 5000:
-        raise ValidationError({"file": "Please import at most 5,000 rows at a time."})
+        raise ValidationError({"file": _("Please import at most 5,000 rows at a time.")})
     return out
 
 
@@ -91,7 +92,7 @@ class ImportView(APIView):
     def get(self, request, school_id, kind):
         SchoolAccess(request, school_id, read_roles=MANAGERS)
         if kind not in COLUMNS:
-            raise ValidationError("Unknown import type.")
+            raise ValidationError(_("Unknown import type."))
         wb = Workbook()
         ws = wb.active
         ws.title = kind
@@ -104,10 +105,10 @@ class ImportView(APIView):
     def post(self, request, school_id, kind):
         access = SchoolAccess(request, school_id, read_roles=MANAGERS, write_roles=MANAGERS)
         if kind not in COLUMNS:
-            raise ValidationError("Unknown import type.")
+            raise ValidationError(_("Unknown import type."))
         upload = request.FILES.get("file")
         if not upload:
-            raise ValidationError({"file": "Choose a file."})
+            raise ValidationError({"file": _("Choose a file.")})
         rows = read_rows(upload)
         commit = truthy(request.data.get("commit", "0"))
         importer = getattr(self, f"import_{kind}")
@@ -131,13 +132,13 @@ class ImportView(APIView):
         for line, r in rows:
             name, code = cell(r, "name"), cell(r, "code").upper()
             if not name or not code:
-                errors.append({"line": line, "error": "name and code are required"})
+                errors.append({"line": line, "error": _("name and code are required")})
                 continue
             rtype = cell(r, "requires_room_type")
             if rtype and rtype not in ("lab", "computer_lab", "gym", "other", "regular"):
-                errors.append({"line": line, "error": f"unknown room type '{rtype}'"})
+                errors.append({"line": line, "error": _("unknown room type '%(type)s'") % {"type": rtype}})
                 continue
-            _, new = Subject.objects.update_or_create(school=school, code=code, defaults={
+            _obj, new = Subject.objects.update_or_create(school=school, code=code, defaults={
                 "name": name, "requires_room_type": "" if rtype == "regular" else rtype, "is_heavy": truthy(cell(r, "is_heavy"))})
             created += new
             updated += not new
@@ -151,11 +152,11 @@ class ImportView(APIView):
             try:
                 cap = int(cell(r, "capacity"))
             except ValueError:
-                errors.append({"line": line, "error": "capacity must be a number"})
+                errors.append({"line": line, "error": _("capacity must be a number")})
                 continue
             rtype = cell(r, "room_type") or "regular"
             if rtype not in ("regular", "lab", "computer_lab", "gym", "other"):
-                errors.append({"line": line, "error": f"unknown room type '{rtype}'"})
+                errors.append({"line": line, "error": _("unknown room type '%(type)s'") % {"type": rtype}})
                 continue
             obj = Classroom.objects.filter(school=school, name__iexact=name).first()
             if obj:
@@ -175,7 +176,7 @@ class ImportView(APIView):
             name = cell(r, "name")
             room = rooms.get(cell(r, "home_room").lower()) if cell(r, "home_room") else None
             if cell(r, "home_room") and not room:
-                errors.append({"line": line, "error": f"room '{cell(r, 'home_room')}' not found - import rooms first"})
+                errors.append({"line": line, "error": _("room '%(room)s' not found - import rooms first") % {"room": cell(r, "home_room")}})
                 continue
             defaults = {"classroom": room}
             for f in ("grade_level", "size"):
@@ -183,7 +184,7 @@ class ImportView(APIView):
                     try:
                         defaults[f] = int(cell(r, f))
                     except ValueError:
-                        errors.append({"line": line, "error": f"{f} must be a number"})
+                        errors.append({"line": line, "error": _("%(field)s must be a number") % {"field": f}})
             obj = StudentGroup.objects.filter(school=school, name__iexact=name).first()
             if obj:
                 for k, v in defaults.items():
@@ -205,7 +206,7 @@ class ImportView(APIView):
             subj_names = [x.strip().lower() for x in cell(r, "subjects").replace("،", ",").split(",") if x.strip()]
             missing = [x for x in subj_names if x not in subjects]
             if missing:
-                errors.append({"line": line, "error": f"unknown subject(s): {', '.join(missing)}"})
+                errors.append({"line": line, "error": _("unknown subject(s): %(subjects)s") % {"subjects": ", ".join(missing)}})
                 continue
             t = Teacher.objects.filter(school=school, name__iexact=name).first()
             new = t is None
@@ -219,7 +220,7 @@ class ImportView(APIView):
                     try:
                         setattr(t, f, int(cell(r, f)))
                     except ValueError:
-                        errors.append({"line": line, "error": f"{f} must be a number"})
+                        errors.append({"line": line, "error": _("%(field)s must be a number") % {"field": f}})
             t.save()
             t.subjects.set([subjects[x] for x in subj_names])
             created += new
@@ -234,25 +235,25 @@ class ImportView(APIView):
         for line, r in rows:
             first = cell(r, "first_name")
             if not first:
-                errors.append({"line": line, "error": "first_name is required"})
+                errors.append({"line": line, "error": _("first_name is required")})
                 continue
             group = groups.get(cell(r, "group").lower()) if cell(r, "group") else None
             if cell(r, "group") and not group:
-                errors.append({"line": line, "error": f"class group '{cell(r, 'group')}' not found"})
+                errors.append({"line": line, "error": _("class group '%(group)s' not found") % {"group": cell(r, "group")}})
                 continue
             dob = None
             if cell(r, "date_of_birth"):
                 try:
                     dob = date.fromisoformat(cell(r, "date_of_birth")[:10])
                 except ValueError:
-                    errors.append({"line": line, "error": "date_of_birth must be YYYY-MM-DD"})
+                    errors.append({"line": line, "error": _("date_of_birth must be YYYY-MM-DD")})
                     continue
             number = cell(r, "student_number")
             s = Student.objects.filter(school=school, student_number=number).first() if number else None
             new = s is None
             if new:
                 if active >= school.max_students:
-                    errors.append({"line": line, "error": f"plan limit of {school.max_students} students reached"})
+                    errors.append({"line": line, "error": _("plan limit of %(n)s students reached") % {"n": school.max_students}})
                     continue
                 s = Student(school=school)
                 active += 1
@@ -333,7 +334,7 @@ class ExportView(APIView):
                            g.student.full_name, float(g.score) if g.score is not None else None, float(a.max_score), pct])
         elif kind == "fees":
             if not access.is_manager:
-                raise ValidationError("Only admin and staff export fees.")
+                raise ValidationError(_("Only admin and staff export fees."))
             from ..models import Payment, StudentFee
             styled(ws, ["Student", "Group", f"Billed ({school.currency})", "Paid", "Balance"])
             billed, paid = defaultdict(float), defaultdict(float)
@@ -350,7 +351,7 @@ class ExportView(APIView):
             tt = Timetable.objects.filter(school=school, id=p.get("timetable")).first() if p.get("timetable") \
                 else active_timetable(school)
             if not tt:
-                raise ValidationError("No timetable yet.")
+                raise ValidationError(_("No timetable yet."))
             data = build_timetable_pages(tt, p.get("type", "grade"))
             from api.scheduling.solver import DAY_NAMES
             wb.remove(ws)
@@ -365,6 +366,6 @@ class ExportView(APIView):
             if not wb.worksheets:
                 wb.create_sheet("Empty")
         else:
-            raise ValidationError("Unknown export.")
+            raise ValidationError(_("Unknown export."))
         log(school, request.user, "view", None, model=f"export.{kind}", summary=f"Exported {kind}")
         return xlsx_response(wb, f"{school.name}-{kind}-{timezone.localdate()}.xlsx".replace(" ", "_"))

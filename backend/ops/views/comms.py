@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.utils.translation import gettext as _
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -12,6 +13,8 @@ from rest_framework.views import APIView
 
 from api.access import SchoolAccess
 from api.notify import notify
+from api.i18n import format_value
+from api.scheduling.messages import Msg
 
 from ..common import ALL_ROLES, MANAGERS, SchoolModelViewSet, guardian_users, members, my_children, teacher_for
 from ..models import (
@@ -82,7 +85,7 @@ class AnnouncementViewSet(SchoolModelViewSet):
             teacher = teacher_for(self.request.user, access.school)
             if not teacher or not group or not group.timetable_entries.filter(teacher=teacher).exists():
                 from rest_framework.exceptions import PermissionDenied
-                raise PermissionDenied("You can only message groups you teach.")
+                raise PermissionDenied(_("You can only message groups you teach."))
         a = serializer.save(school=access.school, author=self.request.user)
         if a.publish_at <= timezone.now():
             dispatch_announcement(a)
@@ -90,7 +93,7 @@ class AnnouncementViewSet(SchoolModelViewSet):
     def perform_update(self, serializer):
         if serializer.instance.sent_at:
             from rest_framework.exceptions import ValidationError
-            raise ValidationError("This announcement was already sent and can no longer be edited.")
+            raise ValidationError(_("This announcement was already sent and can no longer be edited."))
         a = serializer.save()
         if a.publish_at <= timezone.now():
             dispatch_announcement(a)
@@ -148,10 +151,11 @@ class CalendarEventViewSet(SchoolModelViewSet):
         from ..common import parse_date
         day = parse_date(request.data.get("date"), timezone.localdate() + timedelta(days=1))
         reason = str(request.data.get("reason", ""))[:300]
-        event = CalendarEvent.objects.create(school=school, title=f"No school - {reason}" if reason else "No school",
+        event = CalendarEvent.objects.create(school=school, title=(_("No school - %(reason)s") % {"reason": reason}) if reason else _("No school"),
                                              kind="no_school", start_date=day, end_date=day, description=reason)
-        a = Announcement.objects.create(school=school, author=request.user, title=f"No school on {day:%A %d %B}",
-                                        body=reason or "School is closed on this day.", audience="school", urgent=True)
+        a = Announcement.objects.create(school=school, author=request.user,
+                                        title=_("No school on %(day)s") % {"day": format_value(day)},
+                                        body=reason or _("School is closed on this day."), audience="school", urgent=True)
         dispatch_announcement(a)
         return Response({"event": event.id, "announcement": a.id}, status=status.HTTP_201_CREATED)
 
@@ -184,29 +188,29 @@ class ThreadViewSet(SchoolModelViewSet):
         student = serializer.validated_data.get("student")
         if student and not my_children(self.request.user, access.school).filter(id=student.id).exists():
             from rest_framework.exceptions import ValidationError
-            raise ValidationError({"student": "Unknown student."})
+            raise ValidationError({"student": _("Unknown student.")})
         body = serializer.validated_data.pop("body", "")
         thread = serializer.save(school=access.school, parent=self.request.user)
         if body:
             Message.objects.create(thread=thread, author=self.request.user, body=body)
-        notify(access.school, members(access.school, *MANAGERS), "message", f"New message: {thread.subject}",
-               body[:200], link="/messages")
+        notify(access.school, members(access.school, *MANAGERS), "message",
+               Msg("New message: %(subject)s", subject=thread.subject), body[:200], link="/messages")
 
     @action(detail=True, methods=["post"])
     def reply(self, request, pk=None, school_id=None):
         thread = self.get_object()
         body = str(request.data.get("body", "")).strip()
         if not body:
-            return Response({"error": "Write a message."}, status=400)
+            return Response({"error": _("Write a message.")}, status=400)
         msg = Message.objects.create(thread=thread, author=request.user, body=body)
         thread.status = "open"
         thread.save(update_fields=["status", "updated_at"])
         if request.user.id == thread.parent_id:
-            notify(thread.school, members(thread.school, *MANAGERS), "message", f"Reply: {thread.subject}",
-                   body[:200], link="/messages")
+            notify(thread.school, members(thread.school, *MANAGERS), "message",
+                   Msg("Reply: %(subject)s", subject=thread.subject), body[:200], link="/messages")
         else:
-            notify(thread.school, [thread.parent], "message", f"Reply from school: {thread.subject}", body[:200],
-                   link="/messages")
+            notify(thread.school, [thread.parent], "message",
+                   Msg("Reply from school: %(subject)s", subject=thread.subject), body[:200], link="/messages")
         return Response(MessageSerializer(msg).data, status=201)
 
     @action(detail=True, methods=["post"])

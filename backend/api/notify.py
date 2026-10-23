@@ -21,6 +21,7 @@ from django.core.mail import send_mail
 from django.db import close_old_connections
 
 from .models import Notification, PushSubscription, UserProfile
+from .scheduling.messages import Msg
 
 log = logging.getLogger(__name__)
 
@@ -123,13 +124,20 @@ def _fan_out(notification_ids, channels, threaded=False):
 
 
 def notify(school, users, kind, title, body="", link="", data=None, channels=("push", "email")):
-    """Create in-app notifications for `users` (deduplicated) and send them on the external channels."""
+    """Create in-app notifications for `users` (deduplicated) and send them on the external channels.
+
+    title/body may be Msg templates: each recipient gets them in their own language.
+    """
+    from .i18n import render, user_language
     seen, rows = set(), []
     for u in users:
         if u is None or u.id in seen:
             continue
         seen.add(u.id)
-        rows.append(Notification(school=school, user=u, kind=kind, title=title[:200], body=body, link=link,
+        lang = user_language(u, school)
+        t = render(title, lang) if isinstance(title, Msg) else str(title)
+        b = render(body, lang) if isinstance(body, Msg) else str(body or "")
+        rows.append(Notification(school=school, user=u, kind=kind, title=t[:200], body=b, link=link,
                                  data=data or {}, channels_sent=["inapp"]))
     if not rows:
         return []
