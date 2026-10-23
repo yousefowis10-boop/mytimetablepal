@@ -89,7 +89,7 @@ GitHub Actions runs both on every push (`.github/workflows/ci.yml`).
 ### Backend + database on Railway
 
 1. railway.com → **New Project** → **Deploy from GitHub repo** → pick `mytimetablepal`.
-2. Open the new service → **Settings** → **Root Directory** = `backend`. Railway then uses `railway.json` (repo root): it collects static files at build time, runs `migrate` before each deploy, starts gunicorn, and health-checks `/api/health/`.
+2. Open the new service → **Settings** → **Root Directory** = `backend`. Railway then uses `backend/railway.json`: it collects static files at build time, runs `migrate` before each deploy, starts gunicorn, and health-checks `/api/health/`.
 3. In the project canvas: **+ Create** → **Database** → **PostgreSQL**.
 4. Service → **Variables**: add `SECRET_KEY` (new random value), `DEBUG=False`, `DATABASE_URL=${{Postgres.DATABASE_URL}}`, `CORS_ALLOWED_ORIGINS=<your Vercel URL>`.
 5. Service → **Settings** → **Networking** → **Generate Domain**.
@@ -110,7 +110,7 @@ backend/
   api/                     models, serializers, views, urls, tests
   api/management/commands/seed_demo.py
   rest_app/settings.py     all config from environment variables
-  Procfile                 start commands (Railway uses /railway.json)
+  railway.json, Procfile   deploy/start commands
 frontend/
   src/config/api.js        reads VITE_API_URL
   src/services/api.js      REST client used by the pages

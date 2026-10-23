@@ -3,7 +3,7 @@
   "build": {
     "builder": "RAILPACK",
     "buildCommand": "python manage.py collectstatic --noinput",
-    "watchPatterns": ["backend/**"]
+    "watchPatterns": ["/backend/**"]
   },
   "deploy": {
     "preDeployCommand": [
