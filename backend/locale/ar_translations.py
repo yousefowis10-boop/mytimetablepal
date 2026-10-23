@@ -96,6 +96,7 @@ AR = {
     "No valid timetable was found within %(seconds)s seconds. Try a longer time limit, or check the busiest teachers and rooms.": "لم يتم إيجاد جدول صالح خلال %(seconds)s ثانية. جرّب مهلة أطول، أو راجع أكثر المعلمين والغرف انشغالاً.",
     "Not enough seats: %(children)s children ride in the %(direction)s, but the %(buses)s bus(es) have %(seats)s seats.": "المقاعد لا تكفي: %(children)s طفلاً يستخدمون الحافلات في فترة %(direction)s، والحافلات (%(buses)s) فيها %(seats)s مقعداً فقط.",
     "Not enough teacher time: the qualified teachers' availability and weekly limits cannot cover every group's lessons at once. Add teachers, widen availability, or reduce lessons per week.": "وقت المعلمين لا يكفي: توفّر المعلمين المؤهلين وحدودهم الأسبوعية لا تغطي حصص جميع الشعب. أضف معلمين أو وسّع أوقات التوفّر أو قلّل الحصص الأسبوعية.",
+    "Could not find a teacher for every lesson within the time limit. Try a longer time limit, or add teachers / widen availability.": "تعذّر إيجاد معلم لكل حصة ضمن الوقت المحدد. جرّب وقتاً أطول، أو أضف معلمين / وسّع أوقات التوفّر.",
     "Not your homework.": "هذا الواجب ليس لك.",
     "Only %(k)s of %(v)s buses are needed to serve every child within the limits (rides get longer with fewer buses).": "يكفي %(k)s حافلات من أصل %(v)s لخدمة جميع الأطفال ضمن الحدود (تطول الرحلات مع تقليل الحافلات).",
     "Only admin and staff export fees.": "تصدير الرسوم متاح للإدارة والموظفين فقط.",

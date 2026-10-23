@@ -64,11 +64,11 @@ msgstr "تحتاج الشعبة %(group)s إلى %(n)s حصة أسبوعياً،
 msgid "%(group)s needs %(subject)s but no teacher is qualified to teach %(subject)s."
 msgstr "تحتاج الشعبة %(group)s إلى مادة %(subject)s ولا يوجد معلم مؤهل لتدريسها."
 
-#: api\scheduling\solver.py:582
+#: api\scheduling\solver.py:631
 msgid "%(group)s: %(n)s %(subject)s lessons (%(doubles)s as double periods) with %(teacher)s"
 msgstr "%(group)s: %(n)s حصص %(subject)s (منها %(doubles)s مزدوجة) مع %(teacher)s"
 
-#: api\scheduling\solver.py:585
+#: api\scheduling\solver.py:634
 msgid "%(group)s: %(n)s %(subject)s lessons with %(teacher)s"
 msgstr "%(group)s: %(n)s حصص %(subject)s مع %(teacher)s"
 
@@ -188,7 +188,7 @@ msgstr "يوجد حساب بهذا البريد الإلكتروني."
 msgid "Another subject in this school already uses this code."
 msgstr "هذا الرمز مستخدم لمادة أخرى في المدرسة."
 
-#: api\scheduling\solver.py:773
+#: api\scheduling\solver.py:822
 msgid "Assigning teachers"
 msgstr "توزيع المعلمين"
 
@@ -224,6 +224,10 @@ msgstr "اختر طلاباً أو شعباً أو صفاً."
 msgid "Choose the lesson period."
 msgstr "اختر الحصة."
 
+#: api\scheduling\solver.py:413
+msgid "Could not find a teacher for every lesson within the time limit. Try a longer time limit, or add teachers / widen availability."
+msgstr "تعذّر إيجاد معلم لكل حصة ضمن الوقت المحدد. جرّب وقتاً أطول، أو أضف معلمين / وسّع أوقات التوفّر."
+
 #: ops\views\staffing.py:152
 msgid "Cover on %(day)s"
 msgstr "حصة بديلة يوم %(day)s"
@@ -256,7 +260,7 @@ msgstr "رسوم تستحق قريباً"
 msgid "Fee overdue"
 msgstr "رسوم متأخرة"
 
-#: api\scheduling\solver.py:794
+#: api\scheduling\solver.py:843
 msgid "Found solution #%(n)s (penalty %(penalty)s)"
 msgstr "تم إيجاد الحل رقم %(n)s (نقاط الجزاء %(penalty)s)"
 
@@ -352,7 +356,7 @@ msgstr "لا توجد متطلبات للمواد. أضف الحصص الأسب�
 msgid "No terms are set up yet."
 msgstr "لم تُحدَّد الفصول الدراسية بعد."
 
-#: api\scheduling\solver.py:814
+#: api\scheduling\solver.py:863
 msgid "No timetable satisfies all the rules together. Check teacher availability, room types and lessons per week for the busiest groups and teachers."
 msgstr "لا يوجد جدول يحقق جميع القواعد معاً. راجع توفّر المعلمين وأنواع الغرف وعدد الحصص الأسبوعية لأكثر الشعب والمعلمين انشغالاً."
 
@@ -364,7 +368,7 @@ msgstr "لا يوجد جدول بعد."
 msgid "No valid timetable exists with the current data."
 msgstr "لا يوجد جدول صالح بالبيانات الحالية."
 
-#: api\scheduling\solver.py:819
+#: api\scheduling\solver.py:868
 msgid "No valid timetable was found within %(seconds)s seconds. Try a longer time limit, or check the busiest teachers and rooms."
 msgstr "لم يتم إيجاد جدول صالح خلال %(seconds)s ثانية. جرّب مهلة أطول، أو راجع أكثر المعلمين والغرف انشغالاً."
 
@@ -372,7 +376,7 @@ msgstr "لم يتم إيجاد جدول صالح خلال %(seconds)s ثانية
 msgid "Not enough seats: %(children)s children ride in the %(direction)s, but the %(buses)s bus(es) have %(seats)s seats."
 msgstr "المقاعد لا تكفي: %(children)s طفلاً يستخدمون الحافلات في فترة %(direction)s، والحافلات (%(buses)s) فيها %(seats)s مقعداً فقط."
 
-#: api\scheduling\solver.py:368
+#: api\scheduling\solver.py:417
 msgid "Not enough teacher time: the qualified teachers' availability and weekly limits cannot cover every group's lessons at once. Add teachers, widen availability, or reduce lessons per week."
 msgstr "وقت المعلمين لا يكفي: توفّر المعلمين المؤهلين وحدودهم الأسبوعية لا تغطي حصص جميع الشعب. أضف معلمين أو وسّع أوقات التوفّر أو قلّل الحصص الأسبوعية."
 
@@ -408,7 +412,7 @@ msgstr "تم استلام دفعة"
 msgid "Placed %(n)s lessons (kept %(k)s)."
 msgstr "تم توزيع %(n)s حصة (مع إبقاء %(k)s)."
 
-#: api\scheduling\solver.py:779
+#: api\scheduling\solver.py:828
 msgid "Placing lessons"
 msgstr "توزيع الحصص"
 
@@ -416,7 +420,7 @@ msgstr "توزيع الحصص"
 msgid "Please import at most 5,000 rows at a time."
 msgstr "يرجى استيراد 5000 سطر كحد أقصى في كل مرة."
 
-#: api\scheduling\solver.py:831
+#: api\scheduling\solver.py:880
 msgid "Polishing"
 msgstr "تحسين نهائي"
 
@@ -536,7 +540,7 @@ msgstr "لا توجد حصص دراسية في جدول الحصص بعد."
 msgid "The stop '%(stop)s' has %(n)s children but the largest bus has %(seats)s seats."
 msgstr "في المحطة «%(stop)s» عدد %(n)s أطفال، بينما أكبر حافلة فيها %(seats)s مقعداً."
 
-#: api\scheduling\solver.py:589
+#: api\scheduling\solver.py:638
 msgid "These lessons cannot all be placed together without a clash (same group, teacher or room at the same time, or outside teacher availability): %(lessons)s."
 msgstr "لا يمكن توزيع هذه الحصص معاً دون تعارض (الشعبة أو المعلم أو الغرفة نفسها في الوقت نفسه، أو خارج أوقات توفّر المعلم): %(lessons)s."
 

@@ -26,6 +26,7 @@ from .messages import Msg
 
 INTERLEAVE = True
 DET_PER_SECOND = 0.3
+LARGE_SCHOOL_LESSONS = 1400   # lessons a week above which placement starts from a feasible timetable
 
 DEFAULT_WEIGHTS = {
     "spread": 10,
@@ -306,6 +307,36 @@ def precheck(p: Problem) -> list:
 
 
 # ---------------------------------------------------------------- stage 1: teacher assignment
+def _greedy_assignment(ix: _Index, reqs):
+    """A quick deterministic assignment used as a CP-SAT hint (and fallback). None if it gets stuck."""
+    left = {t.id: ix.teacher_capacity(t) for t in ix.p.teachers}
+    order = sorted(reqs, key=lambda ir: (len(ix.qualified(ir[1].subject_id)), -ix.remaining(ir[1]), ir[0]))
+    plan = {}
+    for i, req in order:
+        rem = ix.remaining(req)
+        q = sorted(ix.qualified(req.subject_id), key=lambda t: (-left[t.id], t.id))
+        whole = [t for t in q if left[t.id] >= rem]
+        if whole:
+            plan[i] = [(whole[0].id, rem)]
+            left[whole[0].id] -= rem
+            continue
+        if req.doubles:
+            return None
+        parts = []
+        for t in q:
+            if rem == 0:
+                break
+            c = min(rem, left[t.id])
+            if c > 0:
+                parts.append((t.id, c))
+                left[t.id] -= c
+                rem -= c
+        if rem:
+            return None
+        plan[i] = parts
+    return plan
+
+
 def _assign_teachers(ix: _Index, time_limit: float, seed: int, workers: int):
     """Returns ({req_index: [(teacher_id, count)]}, stats, reasons)."""
     p = ix.p
@@ -356,6 +387,14 @@ def _assign_teachers(ix: _Index, time_limit: float, seed: int, workers: int):
 
     w = ix.weights
     m.Minimize(w["teacher_split"] * sum(split_terms) + w["load_balance"] * sum(balance_terms))
+    greedy = _greedy_assignment(ix, reqs)
+    if greedy is not None:
+        for i, _ in reqs:
+            given = dict(greedy[i])
+            for t in ix.qualified(p.requirements[i].subject_id):
+                c = given.get(t.id, 0)
+                m.AddHint(n[i, t.id], c)
+                m.AddHint(uses[i, t.id], 1 if c else 0)
     solver = cp_model.CpSolver()
     solver.parameters.max_deterministic_time = time_limit * DET_PER_SECOND
     solver.parameters.max_time_in_seconds = time_limit * 1.3
@@ -364,6 +403,26 @@ def _assign_teachers(ix: _Index, time_limit: float, seed: int, workers: int):
     solver.parameters.interleave_search = INTERLEAVE
     status = solver.Solve(m)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+        if status == cp_model.UNKNOWN and greedy is not None:
+            # Out of time before improving on the quick assignment: use it as it is.
+            plan = defaultdict(list, {i: list(v) for i, v in greedy.items()})
+            splits = sum(1 for i, _ in reqs if len(plan[i]) > 1)
+            load = defaultdict(int)
+            for parts in plan.values():
+                for tid, c in parts:
+                    load[tid] += c
+            imbalance = 0
+            for s in p.subjects:
+                q = [load[t.id] for t in ix.qualified(s.id) if load_terms.get(t.id)]
+                if len(q) >= 2:
+                    imbalance += max(q) - min(q)
+            return plan, {"stage1_status": "GREEDY", "teacher_split": splits, "load_balance": imbalance,
+                          "stage1_seconds": round(solver.WallTime(), 2)}, []
+        if status == cp_model.UNKNOWN:
+            return None, {"stage1_status": solver.StatusName(status)}, [
+                Msg("Could not find a teacher for every lesson within the time limit. Try a longer time limit, "
+                    "or add teachers / widen availability.")
+            ]
         return None, {"stage1_status": solver.StatusName(status)}, [
             Msg("Not enough teacher time: the qualified teachers' availability and weekly limits cannot cover every "
                 "group's lessons at once. Add teachers, widen availability, or reduce lessons per week.")
@@ -778,8 +837,17 @@ def solve(p: Problem, on_progress=None) -> Result:
     if on_progress:
         on_progress(0.1, Msg("Placing lessons"))
 
-    def run(strict, seconds, lo, hi):
+    def run(strict, seconds, lo, hi, feasibility=False, hint=None):
         model, units_, x_, room_vars_, penalties_, _ = _build_placement(ix, plan, strict_spread=strict)
+        if feasibility:
+            model.ClearObjective()
+        if hint:
+            for key, var in x_.items():
+                model.AddHint(var, hint.get(("x",) + key, 0))
+            for key, rv in room_vars_.items():
+                for rid, var in rv:
+                    if var.Index() != x_[key].Index():
+                        model.AddHint(var, hint.get(("y",) + key + (rid,), 0))
         solver_ = cp_model.CpSolver()
         # Deterministic budget so the same input gives the same timetable; the wall clock is only a safety
         # net. CP-SAT's deterministic time runs at roughly a third of wall time on this model.
@@ -790,7 +858,7 @@ def solve(p: Problem, on_progress=None) -> Result:
         solver_.parameters.interleave_search = INTERLEAVE
 
         def cb(count, objective, wall):
-            if on_progress:
+            if on_progress and not feasibility:
                 on_progress(lo + (hi - lo) * min(1.0, wall / seconds), Msg("Found solution #%(n)s (penalty %(penalty)s)", n=count, penalty=int(objective)))
 
         st = solver_.Solve(model, _Progress(cb))
@@ -798,15 +866,44 @@ def solve(p: Problem, on_progress=None) -> Result:
         stats["constraints"] = len(model.Proto().constraints)
         return st, solver_, units_, x_, room_vars_, penalties_
 
+    def snapshot(solver_, x_, room_vars_):
+        h = {("x",) + key: solver_.Value(var) for key, var in x_.items()}
+        for key, rv in room_vars_.items():
+            for rid, var in rv:
+                h[("y",) + key + (rid,)] = solver_.Value(var)
+        return h
+
+    def foothold(seconds):
+        """Any valid timetable (no preferences, repeats in a day allowed), as a starting point."""
+        st, solver_, _u, x_, room_vars_, _pen = run(False, seconds, 0.1, 0.3, feasibility=True)
+        stats["phase1_seconds"] = round(time.monotonic() - t0, 2)
+        if st in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+            return st, snapshot(solver_, x_, room_vars_)
+        return st, None
+
+    lessons_total = sum(ix.remaining(r) for r in p.requirements)
     remaining = max(1.0, limit - (time.monotonic() - t0))
-    status, solver, units, x, room_vars, penalties = run(True, remaining, 0.1, 0.95)
-    stats["spread_mode"] = "strict"
-    if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-        # Strict spreading impossible (or not found in time): allow repeats in a day, penalised.
-        remaining = max(limit * 0.25, limit - (time.monotonic() - t0))
-        status, solver, units, x, room_vars, penalties = run(False, remaining, 0.5, 0.98)
+    if lessons_total > LARGE_SCHOOL_LESSONS:
+        # Large schools: searching with all preferences from scratch rarely finds a first timetable in time.
+        # Find a valid one first, then improve it; subjects are spread by the penalty rather than strictly.
+        status, hint = foothold(remaining * 0.6)
         stats["spread_mode"] = "relaxed"
-    stats["status"] = solver.StatusName(status)
+        if hint is not None:
+            remaining = max(1.0, limit - (time.monotonic() - t0))
+            status, solver, units, x, room_vars, penalties = run(False, remaining, 0.3, 0.98, hint=hint)
+    else:
+        status, solver, units, x, room_vars, penalties = run(True, remaining, 0.1, 0.95)
+        stats["spread_mode"] = "strict"
+        if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+            # Strict spreading impossible (or not found in time): allow repeats in a day, penalised, starting
+            # from any valid timetable.
+            stats["spread_mode"] = "relaxed"
+            budget = max(limit * 0.25, limit - (time.monotonic() - t0))
+            status, hint = foothold(budget * 0.6)
+            if hint is not None:
+                remaining = max(budget * 0.4, limit - (time.monotonic() - t0))
+                status, solver, units, x, room_vars, penalties = run(False, remaining, 0.6, 0.98, hint=hint)
+    stats["status"] = cp_model.CpSolver().StatusName(status)
     stats["seconds"] = round(time.monotonic() - t0, 2)
     if status == cp_model.INFEASIBLE:
         diag = _diagnose(ix, plan, min(30.0, limit))
