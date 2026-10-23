@@ -103,8 +103,9 @@ CHANNELS = [PushChannel(), EmailChannel(), NotConnectedChannel("sms", "SMS_PROVI
             NotConnectedChannel("whatsapp", "WHATSAPP_PROVIDER")]
 
 
-def _fan_out(notification_ids, channels):
-    close_old_connections()
+def _fan_out(notification_ids, channels, threaded=False):
+    if threaded:
+        close_old_connections()
     try:
         for n in Notification.objects.filter(id__in=notification_ids).select_related("user", "school"):
             sent = ["inapp"]
@@ -117,7 +118,8 @@ def _fan_out(notification_ids, channels):
                         log.exception("Channel %s failed", ch.name)
             Notification.objects.filter(id=n.id).update(channels_sent=sent)
     finally:
-        close_old_connections()
+        if threaded:
+            close_old_connections()
 
 
 def notify(school, users, kind, title, body="", link="", data=None, channels=("push", "email")):
@@ -137,7 +139,7 @@ def notify(school, users, kind, title, body="", link="", data=None, channels=("p
         if getattr(settings, "NOTIFY_SYNC", False):
             _fan_out(ids, channels)
         else:
-            threading.Thread(target=_fan_out, args=(ids, channels), daemon=True).start()
+            threading.Thread(target=_fan_out, args=(ids, channels, True), daemon=True).start()
     return created
 
 

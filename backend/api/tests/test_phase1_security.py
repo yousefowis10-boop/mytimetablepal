@@ -219,11 +219,18 @@ class AuthAndHealthTests(TestCase):
 
 class SeedDemoTests(TestCase):
     def test_seed_is_repeatable(self):
-        call_command("seed_demo", stdout=StringIO())
-        call_command("seed_demo", stdout=StringIO())
+        call_command("seed_demo", "--skip-solvers", "--small", stdout=StringIO())
+        call_command("seed_demo", "--skip-solvers", "--small", stdout=StringIO())
         school = School.objects.get(name="Amman Demo School")
         self.assertEqual(School.objects.filter(name="Amman Demo School").count(), 1)
-        self.assertEqual(school.student_groups.count(), 30)
+        self.assertEqual(School.objects.filter(name="Irbid Demo School").count(), 1)
+        from api.models import Membership
+        roles = set(Membership.objects.filter(user__username__endswith="@demo.mytimetablepal.com", school=school)
+                    .values_list("role", flat=True))
+        self.assertEqual(roles, {"admin", "staff", "teacher", "parent", "driver"})
+        parent_schools = Membership.objects.filter(user__username="parent@demo.mytimetablepal.com").count()
+        self.assertEqual(parent_schools, 2)    # one parent, two schools
+        self.assertEqual(school.student_groups.count(), 10)
         self.assertEqual(school.teachers.count(), 55)
         self.assertEqual(school.subjects.count(), 15)
         self.assertEqual(school.classrooms.count(), 39)
@@ -260,8 +267,8 @@ class SeedIfMissingTests(TestCase):
             call_command("seed_demo", "--if-missing", stdout=StringIO())
         self.assertFalse(School.objects.exists())
         with mock.patch.dict(os.environ, {"SEED_DEMO": "true"}):
-            call_command("seed_demo", "--if-missing", stdout=StringIO())
-            school = School.objects.get()
+            call_command("seed_demo", "--if-missing", "--skip-solvers", "--small", stdout=StringIO())
+            school = School.objects.get(name="Amman Demo School")
             Classroom.objects.create(school=school, name="Kept", capacity=5)
-            call_command("seed_demo", "--if-missing", stdout=StringIO())
+            call_command("seed_demo", "--if-missing", "--skip-solvers", "--small", stdout=StringIO())
         self.assertTrue(Classroom.objects.filter(name="Kept").exists())

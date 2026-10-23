@@ -100,10 +100,11 @@ def save_lessons(timetable, kept_ids, lessons):
         ])
 
 
-def run_job(job_id):
+def run_job(job_id, threaded=False):
     from .scheduling.solver import solve
 
-    close_old_connections()
+    if threaded:
+        close_old_connections()
     job = TimetableJob.objects.select_related("timetable__school", "timetable__schedule").get(id=job_id)
     TimetableJob.objects.filter(id=job_id).update(status="running", started_at=timezone.now(), progress=1,
                                                   message="Preparing data")
@@ -139,7 +140,8 @@ def run_job(job_id):
         TimetableJob.objects.filter(id=job_id).update(status="failed", progress=100, finished_at=timezone.now(),
                                                       message=f"Generator error: {exc}"[:500])
     finally:
-        close_old_connections()
+        if threaded:
+            close_old_connections()
 
 
 def start_job(timetable, user, params):
@@ -147,7 +149,7 @@ def start_job(timetable, user, params):
     if getattr(settings, "TIMETABLE_JOBS_SYNC", False):
         run_job(job.id)
     else:
-        threading.Thread(target=run_job, args=(job.id,), daemon=True, name=f"timetable-job-{job.id}").start()
+        threading.Thread(target=run_job, args=(job.id, True), daemon=True, name=f"timetable-job-{job.id}").start()
     job.refresh_from_db()
     return job
 
